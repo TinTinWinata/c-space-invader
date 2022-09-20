@@ -5,55 +5,153 @@
 #include <conio.h>
 #include <windows.h>
 
+// Variable
 const int TOTAL_TEXT = 3;
+const int MAX_UI_TEXT = 10;
+const int MAX_ENEMY = 255;
 
-class Shooter
+// Function Prototype List
+void spawnEnemy();
+void renderEnemy();
+void theGame();
+void render();
+void renderGame();
+void forceCls();
+void cls();
+void renderLobby();
+void moveCursor(int x, int y);
+void resetCursor();
+void removeCoordinate(int x, int y);
+void startGame();
+void loadSprite(char *_filename, char sprite[255][255]);
+
+class UI
 {
 public:
-  int h = 5;
-  int w = 7;
-  int x = 3;
-  int y = 3;
-  char shooter[255][255]; 
-  Shooter(int level)
+  int x;
+  int totalText = 0;
+  char text[MAX_UI_TEXT][255];
+  int y;
+
+  UI(int _x, int _y)
   {
-    if (level == 1)
+    x = _x;
+    y = _y;
+    cleanAllText();
+  }
+
+  void addText(int idx, char *val)
+  {
+    if (idx >= MAX_UI_TEXT)
     {
-      loadPlayer("space");
+      printf("Invalid text!");
+      getchar();
     }
-    else if (level == 2)
+    strcpy(text[idx], val);
+  }
+
+  void cleanAllText()
+  {
+    for (int i = 0; i < MAX_UI_TEXT; i++)
     {
+      strcpy(text[i], EMPTY_50);
     }
   }
 
-  void loadPlayer(char *_filename)
+  void cleanText(int idx)
   {
-    FILE *ptr;
-    char ch;
-    strncat(_filename, ".txt", 4);
-    ptr = fopen(_filename, "r");
-    int jIdx = 0;
-    int iIdx = 0;
-    do
+    strcpy(text[idx], EMPTY_50);
+  }
+
+  void render(int idx)
+  {
+    moveCursor(y, x + idx);
+    printf("%s", text[idx]);
+    resetCursor();
+  }
+
+  void renderAll()
+  {
+    for (int i = 0; i < MAX_UI_TEXT; i++)
     {
-      ch = fgetc(ptr);
-      bool flag = false;
-      if (ch == '\n')
-      {
-        flag = true;
-        iIdx += 1;
-      }
-      else
-      {
-        shooter[iIdx][jIdx] = ch;
-      }
-      jIdx += 1;
-      if (flag)
-        jIdx = 0;
-    } while (ch != EOF);
-    fclose(ptr);
+      moveCursor(y, x + i);
+      printf("%s", text[i]);
+      resetCursor();
+    }
   }
 };
+
+UI *ui;
+
+class Enemy
+{
+public:
+  char sprite[255][255];
+
+  int x;
+  int y;
+  int w = 3;
+  int h = 1;
+  int interval = 0;
+  int maxInterval = 10;
+  Node *lastNode;
+
+  Enemy(int _x, int _y)
+  {
+    x = _x;
+    y = _y;
+    loadSprite("enemy.txt", sprite);
+  }
+
+  void removeLastNode()
+  {
+    for (int i = 0; i < lastNode->h; i++)
+    {
+      moveCursor(lastNode->y, lastNode->x + i);
+      for (int j = 0; j < lastNode->w; j++)
+      {
+        printf(" ");
+      }
+    }
+    lastNode = NULL;
+  }
+
+  void logic()
+  {
+    if (lastNode)
+    {
+      removeLastNode();
+    }
+    lastNode = new Node(x, y, w, h);
+
+    interval += 1;
+    if (interval >= maxInterval)
+    {
+      x += 1;
+      interval = 0;
+    }
+  }
+
+  void render()
+  {
+    logic();
+    if (x <= 0 || x >= SIZE_GAME_X)
+      return;
+
+    for (int i = 0; i < h; i++)
+    {
+      moveCursor(y, x + i);
+      for (int j = 0; j < w; j++)
+      {
+        printf("%c", sprite[i][j]);
+      }
+    }
+    resetCursor();
+  }
+};
+
+int totalEnemy = 0;
+Enemy **enemies = new Enemy *[MAX_ENEMY];
 
 class Game
 {
@@ -65,10 +163,16 @@ public:
   char statusText[255] = "";
   char LOBBY_ARENA[SIZE_LOBBY_X][SIZE_LOBBY_Y];
   char GAME_ARENA[SIZE_GAME_X][SIZE_GAME_Y];
+  bool forceClsFlag = false;
 
   void changeState(char *_state)
   {
     strcpy(state, _state);
+  }
+
+  void nextForceCLS()
+  {
+    forceClsFlag = true;
   }
 
   Game()
@@ -144,18 +248,42 @@ public:
       {
         GAME_ARENA[iIdx][jIdx] = ch;
       }
-
       jIdx += 1;
       if (flag)
         jIdx = 0;
-
     } while (ch != EOF);
     fclose(ptr);
   }
 
+  bool isLobby()
+  {
+    return strcmp(state, "lobby") == 0;
+  }
+
+  bool isGame()
+  {
+    return strcmp(state, "game") == 0;
+  }
+
+  bool isInsideArena(int _x, int _y, int _w, int _h)
+  {
+    if (_x > 0 && _y + _w < SIZE_GAME_Y - 1 && _y > 0 && _x + _h < SIZE_GAME_X)
+    {
+      return true;
+    }
+    else
+    {
+      return false;
+    }
+  }
+
   bool isIntersect(int x, int y)
   {
-    if (LOBBY_ARENA[x][y] == ' ')
+    if (isLobby() && LOBBY_ARENA[x][y] == ' ')
+    {
+      return true;
+    }
+    else if (isGame() && GAME_ARENA[x][y] == ' ')
     {
       return true;
     }
@@ -177,6 +305,244 @@ public:
 };
 
 Game game;
+
+class Bullet
+{
+public:
+  int x;
+  int y;
+  char symbol;
+  Node *lastNode;
+
+  Bullet(int _x, int _y, char _symbol)
+  {
+    x = _x;
+    y = _y;
+    symbol = _symbol;
+  }
+
+  Bullet(char _symbol)
+  {
+    symbol = _symbol;
+  }
+
+  // Bullet Logic
+  void logic()
+  {
+    if (lastNode)
+    {
+      removeCoordinate(y, x);
+    }
+    lastNode = new Node(x, y);
+
+    x -= 1;
+  }
+
+  void render()
+  {
+    logic();
+
+    if (x <= 0 || x >= SIZE_GAME_X)
+      return;
+
+    moveCursor(y, x);
+    printf("%c", symbol);
+    resetCursor();
+  }
+};
+
+class Shooter
+{
+public:
+  const int maxBullets = 10;
+  Bullet **bullets = new Bullet *[maxBullets];
+
+  Node *lastNode = NULL;
+  int hp = 100;
+  int maxHp = 100;
+  int h = 5;
+  int w = 7;
+  int x = 10;
+  int y = 10;
+  char shooter[255][255];
+  char bulletSymbol = '^';
+  int bullet = 0;
+
+  Shooter(int level)
+  {
+    if (level == 1)
+    {
+      loadPlayer("space.txt");
+    }
+    else if (level == 2)
+    {
+      // !TODO Build level 2
+    }
+  }
+
+  void saveLastNode()
+  {
+    lastNode = new Node(x, y, w, h);
+  }
+
+  void shoot()
+  {
+    bullets[bullet] = new Bullet(x, (y + w / 2), bulletSymbol);
+    bullet += 1;
+  }
+
+  void renderStatus()
+  {
+    ui->cleanAllText();
+
+    // Title
+    ui->addText(0, "C Space Invader");
+
+    // Bullet
+    char bulletText[255];
+    sprintf(bulletText, "Bullets %.2d/%.2d", maxBullets - bullet, maxBullets);
+    ui->addText(1, bulletText);
+
+    // Health
+    char hpText[255] = "| ";
+    int mod = hp / 10;
+    for (int i = 0; i < hp; i += mod)
+    {
+      strcat(hpText, "-");
+    }
+    char hpTextTemp[255] = "";
+    sprintf(hpTextTemp, " | [%d/%d]", hp, maxHp);
+    strcat(hpText, hpTextTemp);
+    ui->addText(6, hpText);
+
+    // Render All
+    ui->renderAll();
+  }
+
+  void reload()
+  {
+    bullet = 0;
+  }
+
+  void removeLastNode()
+  {
+    if (lastNode)
+    {
+      for (int i = 0; i < lastNode->h; i++)
+      {
+        moveCursor(lastNode->y, lastNode->x + i);
+        for (int j = 0; j < lastNode->w; j++)
+        {
+          printf(" ");
+        }
+      }
+      lastNode = NULL;
+    }
+  }
+
+  void render()
+  {
+    removeLastNode();
+    for (int i = 0; i < h; i++)
+    {
+      moveCursor(y, x + i);
+      for (int j = 0; j < w; j++)
+      {
+        printf("%c", shooter[i][j]);
+      }
+    }
+    resetCursor();
+    renderStatus();
+  }
+
+  // Shooter Logic
+  void logic()
+  {
+    render();
+  }
+
+  void renderBullets()
+  {
+    for (int i = 0; i < bullet; i++)
+    {
+      if (bullets[i])
+      {
+        bullets[i]->render();
+      }
+    }
+  }
+
+  // Shooter Move
+  void move(char str)
+  {
+    saveLastNode();
+    switch (str)
+    {
+    case 'r':
+      reload();
+      break;
+    case 'w':
+      if (game.isInsideArena(x - 1, y, w, h))
+      {
+        x -= 1;
+      }
+      break;
+    case 'd':
+      if (game.isInsideArena(x, y + 1, w, h))
+      {
+        y += 1;
+      }
+      break;
+    case 's':
+      if (game.isInsideArena(x + 1, y, w, h))
+      {
+        x += 1;
+      }
+      break;
+    case 'a':
+      if (game.isInsideArena(x, y - 1, w, h))
+      {
+        y -= 1;
+      }
+      break;
+    case ' ':
+      if (bullet < maxBullets)
+      {
+        shoot();
+      }
+      break;
+    }
+  }
+
+  void loadPlayer(char *_filename)
+  {
+    FILE *ptr;
+    char ch;
+    ptr = fopen(_filename, "r");
+    int jIdx = 0;
+    int iIdx = 0;
+    do
+    {
+      ch = fgetc(ptr);
+      bool flag = false;
+      if (ch == '\n')
+      {
+        flag = true;
+        iIdx += 1;
+      }
+      else
+      {
+        shooter[iIdx][jIdx] = ch;
+      }
+      jIdx += 1;
+      if (flag)
+        jIdx = 0;
+    } while (ch != EOF);
+    fclose(ptr);
+  }
+};
+
+Shooter shooter(1);
 
 //  Class NPC
 class NPC
@@ -261,7 +627,7 @@ public:
         npcAround->talk();
       if (isInPortal())
       {
-        game.changeState("game");
+        startGame();
       }
       break;
     }
@@ -313,16 +679,10 @@ public:
 };
 Player player;
 
-// Function Prototype List
-void theGame();
-void render();
-void forceCls();
-void cls();
-void renderLobby();
-
 void init()
 {
   game.loadLobby();
+  game.loadGame();
 
   *npcs = new WeaponDealer(16, 6, 'W');
   totalNpc = 1;
@@ -341,11 +701,39 @@ void theGame()
   render();
   while (true)
   {
-    char buffer = getch();
-    player.move(buffer);
-    player.logic();
-    render();
+
+    if (strcmp(game.state, "lobby") == 0)
+    {
+      char buffer = getch();
+      player.move(buffer);
+      player.logic();
+      render();
+    }
+    else if (strcmp(game.state, "game") == 0)
+    {
+      if (kbhit())
+      {
+        char buffer = getch();
+        if (buffer == 'o')
+        {
+          spawnEnemy();
+        }
+        shooter.move(buffer);
+        shooter.logic();
+      }
+      Sleep(20);
+      renderEnemy();
+      shooter.renderBullets();
+    }
   }
+}
+
+void startGame()
+{
+  forceCls();
+  game.changeState("game");
+  ui = new UI(8, 52);
+  // shooter.renderStatus();
 }
 
 void renderLobby()
@@ -375,7 +763,7 @@ void renderLobby()
           continue;
         }
 
-        // If exsts Print the text
+        // If exists Print the text
         PRINT_EMPTY();
         int len = strlen(game.text[j]);
         for (int k = 0; k < len; k++)
@@ -397,22 +785,69 @@ void renderLobby()
   game.clearText();
 }
 
+bool isBlockIntersect(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2)
+{
+  if (x1 + w1 >= x2 && x1 <= x2 + w2 && y1 + h1 >= y2 && y2 <= y2 + h2)
+  {
+    return true;
+  }
+  else
+  {
+    return false;
+  }
+}
+
+bool isIntersect(int x, int y, int x2, int y2, int w2, int h2)
+{
+  if (x >= x2 && x <= x2 + w2 && y > y2 && y <= y2 + h2)
+  {
+    return true;
+  }
+  else
+  {
+    return false;
+  }
+}
+
+void spawnEnemy()
+{
+  int x = 0;
+  int y = randomInt(10, SIZE_GAME_Y - 10);
+  enemies[totalEnemy] = new Enemy(x, y);
+  totalEnemy += 1;
+}
+
+void renderEnemy()
+{
+  for (int i = 0; i < totalEnemy; i++)
+  {
+    enemies[i]->render();
+  }
+}
+
 void renderGame()
 {
   for (int i = 0; i < SIZE_GAME_X; i++)
   {
     for (int j = 0; j < SIZE_GAME_Y; j++)
     {
-
       printf("%c", game.GAME_ARENA[i][j]);
     }
     printf("\n");
   }
+  shooter.render();
 }
 
 void render()
 {
-  cls();
+  if (game.forceClsFlag)
+  {
+    forceCls();
+  }
+  else
+  {
+    cls();
+  }
 
   if (strcmp(game.state, "lobby") == 0)
   {
@@ -436,4 +871,54 @@ void cls()
   cursorPosition.X = 0;
   cursorPosition.Y = 0;
   SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), cursorPosition);
+}
+
+void resetCursor()
+{
+  COORD coord;
+  coord.X = 0;
+  coord.Y = 0;
+  SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
+}
+
+void moveCursor(int x, int y)
+{
+  COORD coord;
+  coord.X = x;
+  coord.Y = y;
+  SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
+}
+
+void removeCoordinate(int x, int y)
+{
+  moveCursor(x, y);
+  printf(" ");
+  resetCursor();
+}
+
+void loadSprite(char *_filename, char sprite[255][255])
+{
+  FILE *ptr;
+  char ch;
+  ptr = fopen(_filename, "r");
+  int jIdx = 0;
+  int iIdx = 0;
+  do
+  {
+    ch = fgetc(ptr);
+    bool flag = false;
+    if (ch == '\n')
+    {
+      flag = true;
+      iIdx += 1;
+    }
+    else
+    {
+      sprite[iIdx][jIdx] = ch;
+    }
+    jIdx += 1;
+    if (flag)
+      jIdx = 0;
+  } while (ch != EOF);
+  fclose(ptr);
 }
