@@ -128,6 +128,7 @@ public:
   int uiIdx = 2;
   Score()
   {
+    printf("Newing score...");
     score = 0;
   }
 
@@ -837,15 +838,21 @@ public:
   int x = 3;
   int y = 10;
 
-  void printStatus()
+  int printStatus(int _x, int _y)
   {
+    moveCursor(_x, _y);
     printf("[%s]\n", name);
+    moveCursor(_x, _y + 1);
     printf("Level : %d\n", level);
+    moveCursor(_x, _y + 2);
     printf("Money : %d\n", money);
+    resetCursor();
+    return 3;
   }
 
-  void renderStatus(int _x, int _y){
-    
+  void
+  renderStatus(int _x, int _y)
+  {
   }
 
   void move(char str)
@@ -943,6 +950,7 @@ void init()
   game.loadGame();
 
   npcs[0] = new NPC(16, 6, 'W', "npc_weapon");
+
   totalNpc = 1;
   forceCls();
 }
@@ -984,15 +992,27 @@ void theGame()
   }
 }
 
+void debug(char *str)
+{
+  printf("%s", str);
+  getchar();
+}
+
 void startGame()
 {
   forceCls();
+
+  debug("1");
   myScore = new Score();
+  debug("2");
   shooter = new Shooter(1);
+  debug("3");
   game.changeState("game");
+  debug("4");
   ui = new UI(8, 52);
+  debug("5");
   myScore->renderUi();
-  // shooter.renderStatus();
+  debug("6");
 }
 
 void renderLobby()
@@ -1041,6 +1061,9 @@ void renderLobby()
     }
     printf("\n");
   }
+
+  // Print Status
+  player.printStatus(SIZE_LOBBY_Y + 4, 3);
   game.clearText();
 }
 
@@ -1227,8 +1250,6 @@ void chooseMenuWeapon(int _idx, int _max)
 
 int menuWeaponShop()
 {
-  player.printStatus();
-  printf("\n");
   printf("Welcome to weapon shop\n");
   printf("1. Pistol\n");
   printf("2. Machinegun\n");
@@ -1238,7 +1259,7 @@ int menuWeaponShop()
 
 void forceCls()
 {
-  cls();
+  // cls();
   // clrscr();
   // printf("SYSTEM CLEAR");
   // system("cls");
