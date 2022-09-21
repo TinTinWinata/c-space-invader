@@ -8,6 +8,7 @@ const int SIZE_GAME_Y = 50;
 
 const char *EMPTY_SPACE = "     ";
 const char *EMPTY_50 = "                                                  ";
+const char *EMPTY_100 = "                                                                                                    ";
 
 void PRINT_EMPTY()
 {

@@ -9,11 +9,18 @@
 const int TOTAL_TEXT = 3;
 const int MAX_UI_TEXT = 10;
 const int MAX_ENEMY = 255;
+const int SLEEP_TIME = 20;
+const int MAX_BULLET = 255;
 
 // Function Prototype List
+void chooseMenuWeapon(int _idx, int _max);
+void makeCoordinate(int _x, int _y, char *_symbol);
+bool isIntersect(int x, int y, int x2, int y2, int w2, int h2);
 void spawnEnemy();
 void renderEnemy();
 void theGame();
+void renderWeaponShop();
+int menuWeaponShop();
 void render();
 void renderGame();
 void forceCls();
@@ -24,6 +31,38 @@ void resetCursor();
 void removeCoordinate(int x, int y);
 void startGame();
 void loadSprite(char *_filename, char sprite[255][255]);
+void spawnEnemyLogic();
+void renderEnemyBullets(Node *node);
+void removeEnemyBullet(int _idx);
+void clsCoordinate(int _x, int _y, int _w, int _h);
+
+// Class Prototype List
+class Enemy;
+class UI;
+class Shooter;
+class Score;
+class Bullet;
+class NPC;
+class Player;
+class Game;
+class EnemyBullet;
+class PlayerBullet;
+
+// Variable List
+
+int totalEnemy = 0;
+int totalNpc = 0;
+int enemyCooldown = 3000; // milliseconds
+int enemySpawnInterval = 0;
+int maxEnemySpawnInterval = enemyCooldown / SLEEP_TIME;
+int enemyBullet = 0;
+
+Enemy **enemies = new Enemy *[MAX_ENEMY];
+UI *ui;
+Score *myScore;
+Shooter *shooter;
+NPC **npcs = new NPC *[10];
+EnemyBullet **enemyBullets = new EnemyBullet *[MAX_BULLET];
 
 class UI
 {
@@ -81,30 +120,189 @@ public:
   }
 };
 
-UI *ui;
+class Score
+{
+
+public:
+  int score = 0;
+  int uiIdx = 2;
+  Score()
+  {
+    score = 0;
+  }
+
+  void increment(int _score)
+  {
+    score += _score;
+  }
+
+  void reset()
+  {
+    score = 0;
+  }
+
+  void save()
+  {
+    // TODO: Save Current Score to highscore.txt
+  }
+
+  void renderUi()
+  {
+    char scoreText[255];
+    sprintf(scoreText, "Score : %.2d", score);
+    ui->cleanText(uiIdx);
+    ui->addText(uiIdx, scoreText);
+    ui->renderAll();
+  }
+
+  int get()
+  {
+    return score;
+  }
+};
+
+class Bullet
+{
+public:
+  int idx;
+  int x;
+  int y;
+  char symbol;
+  Node *lastNode;
+  int damage = 1;
+  int vx = 0;
+
+  Bullet(int _x, int _y, char _symbol, int _idx, int _vx)
+  {
+    idx = _idx;
+    x = _x;
+    y = _y;
+    symbol = _symbol;
+    vx = _vx;
+  }
+
+  Bullet(char _symbol)
+  {
+    symbol = _symbol;
+  }
+
+  bool isEnemyIntersect()
+  {
+    printf("needs to be derived");
+  }
+
+  bool isOutsideMap()
+  {
+    if (x <= 0 || x >= SIZE_GAME_X - 2 || y <= 1 || y >= SIZE_GAME_Y - 1)
+    {
+      return true;
+    }
+    else
+    {
+      return false;
+    }
+  }
+
+  // Bullet Logic
+  void logic()
+  {
+    if (lastNode)
+    {
+      removeCoordinate(y, x);
+    }
+    lastNode = new Node(x, y);
+    x += vx;
+  }
+
+  void render()
+  {
+    logic();
+    moveCursor(y, x);
+    printf("%c", symbol);
+    resetCursor();
+  }
+};
+
+class EnemyBullet : public Bullet
+{
+public:
+  EnemyBullet(int _x, int _y, char _symbol, int _idx, int _vx) : Bullet(_x, _y, _symbol, _idx, _vx){};
+  bool isPlayerIntersect(Node *node)
+  {
+    if (shooter && isIntersect(x, y, node->x, node->y, node->w, node->h))
+    {
+      // Player Intersect
+      return true;
+    }
+    else
+    {
+      return false;
+    }
+  }
+};
 
 class Enemy
 {
 public:
-  char sprite[255][255];
+  char bulletSymbol = '*';
 
+  char sprite[255][255];
   int x;
   int y;
   int w = 3;
   int h = 1;
+
+  int hp = 1;
+  int score = 10;
+  int idx = -1;
+
+  int shootInterval = 0;
+  int maxShootInterval = 200;
+
+  // Movement Speed =  (Sleep Time * Max Interval)
+  // If 10, enemy will move 200 milliseconds
+
   int interval = 0;
-  int maxInterval = 10;
+  int maxInterval = 100;
+
   Node *lastNode;
 
-  Enemy(int _x, int _y)
+  Enemy(int _x, int _y, int _level, int _idx)
   {
+    idx = _idx;
     x = _x;
     y = _y;
-    loadSprite("enemy.txt", sprite);
+    if (_level == 1)
+    {
+      loadSprite("enemy.txt", sprite);
+    }
+  }
+
+  void shoot()
+  {
+    enemyBullets[enemyBullet] = new EnemyBullet(x, (y + w / 2), bulletSymbol, enemyBullet, 1);
+    enemyBullet += 1;
+  }
+
+  void cleanRemoveNode()
+  {
+    for (int i = 0; i < h; i++)
+    {
+      moveCursor(y, x + i);
+      for (int j = 0; j < w; j++)
+      {
+        printf(" ");
+      }
+    }
   }
 
   void removeLastNode()
   {
+    if (x <= 0 || x >= SIZE_GAME_X - 1)
+    {
+      return;
+    }
+
     for (int i = 0; i < lastNode->h; i++)
     {
       moveCursor(lastNode->y, lastNode->x + i);
@@ -116,6 +314,31 @@ public:
     lastNode = NULL;
   }
 
+  void hit(int dmg)
+  {
+    hp -= dmg;
+    if (hp <= 0)
+    {
+      // Remove Last Node
+      if (lastNode)
+        removeLastNode();
+
+      // Clean Remove
+      cleanRemoveNode();
+
+      // Up Score
+      myScore->increment(score);
+      myScore->renderUi();
+
+      // Remove enemy to null
+
+      enemies[idx] = NULL;
+
+      printf("Removed! %d", idx);
+      getchar();
+    }
+  }
+
   void logic()
   {
     if (lastNode)
@@ -124,19 +347,33 @@ public:
     }
     lastNode = new Node(x, y, w, h);
 
+    // Movement Interval
     interval += 1;
     if (interval >= maxInterval)
     {
       x += 1;
       interval = 0;
     }
+
+    // Shoot Interval
+    shootInterval += 1;
+    if (shootInterval >= maxShootInterval)
+    {
+      shootInterval = 0;
+      shoot();
+    }
   }
 
   void render()
   {
+    // printf("Rendering\n");
+    // getchar();
+
     logic();
-    if (x <= 0 || x >= SIZE_GAME_X)
+    if (x <= 0 || x >= SIZE_GAME_X - 1)
+    {
       return;
+    }
 
     for (int i = 0; i < h; i++)
     {
@@ -146,12 +383,10 @@ public:
         printf("%c", sprite[i][j]);
       }
     }
+
     resetCursor();
   }
 };
-
-int totalEnemy = 0;
-Enemy **enemies = new Enemy *[MAX_ENEMY];
 
 class Game
 {
@@ -279,7 +514,7 @@ public:
 
   bool isIntersect(int x, int y)
   {
-    if (isLobby() && LOBBY_ARENA[x][y] == ' ')
+    if (isLobby() && (LOBBY_ARENA[x][y] == ' ' || LOBBY_ARENA[x][y] == '-'))
     {
       return true;
     }
@@ -302,52 +537,26 @@ public:
     {
     }
   }
-};
+} game;
 
-Game game;
-
-class Bullet
+class PlayerBullet : public Bullet
 {
 public:
-  int x;
-  int y;
-  char symbol;
-  Node *lastNode;
+  PlayerBullet(int _x, int _y, char _symbol, int _idx, int _vx) : Bullet(_x, _y, _symbol, _idx, _vx){
 
-  Bullet(int _x, int _y, char _symbol)
+                                                                  };
+  bool isEnemyIntersect()
   {
-    x = _x;
-    y = _y;
-    symbol = _symbol;
-  }
-
-  Bullet(char _symbol)
-  {
-    symbol = _symbol;
-  }
-
-  // Bullet Logic
-  void logic()
-  {
-    if (lastNode)
+    for (int i = 0; i < totalEnemy; i++)
     {
-      removeCoordinate(y, x);
+      if (enemies[i] && isIntersect(x, y, enemies[i]->x, enemies[i]->y, enemies[i]->w, enemies[i]->h))
+      {
+        // Enemy Intersect
+        enemies[i]->hit(damage);
+        return true;
+      }
     }
-    lastNode = new Node(x, y);
-
-    x -= 1;
-  }
-
-  void render()
-  {
-    logic();
-
-    if (x <= 0 || x >= SIZE_GAME_X)
-      return;
-
-    moveCursor(y, x);
-    printf("%c", symbol);
-    resetCursor();
+    return false;
   }
 };
 
@@ -355,9 +564,9 @@ class Shooter
 {
 public:
   const int maxBullets = 10;
-  Bullet **bullets = new Bullet *[maxBullets];
-
+  PlayerBullet **bullets = new PlayerBullet *[maxBullets];
   Node *lastNode = NULL;
+
   int hp = 100;
   int maxHp = 100;
   int h = 5;
@@ -367,6 +576,7 @@ public:
   char shooter[255][255];
   char bulletSymbol = '^';
   int bullet = 0;
+  bool dead = false;
 
   Shooter(int level)
   {
@@ -380,6 +590,16 @@ public:
     }
   }
 
+  void hit(int damage)
+  {
+    hp -= damage;
+    if (hp <= 0)
+    {
+      dead = true;
+    }
+    renderStatus();
+  }
+
   void saveLastNode()
   {
     lastNode = new Node(x, y, w, h);
@@ -387,23 +607,27 @@ public:
 
   void shoot()
   {
-    bullets[bullet] = new Bullet(x, (y + w / 2), bulletSymbol);
+    bullets[bullet] = new PlayerBullet(x, (y + w / 2), bulletSymbol,
+                                       bullet, -1);
     bullet += 1;
   }
 
   void renderStatus()
   {
-    ui->cleanAllText();
+    // Score
 
     // Title
+    ui->cleanText(0);
     ui->addText(0, "C Space Invader");
 
     // Bullet
+    ui->cleanText(1);
     char bulletText[255];
     sprintf(bulletText, "Bullets %.2d/%.2d", maxBullets - bullet, maxBullets);
     ui->addText(1, bulletText);
 
     // Health
+    ui->cleanText(6);
     char hpText[255] = "| ";
     int mod = hp / 10;
     for (int i = 0; i < hp; i += mod)
@@ -419,8 +643,22 @@ public:
     ui->renderAll();
   }
 
+  void removeBullet(int _idx)
+  {
+    removeCoordinate(bullets[_idx]->y, bullets[_idx]->x);
+    // free(bullets[_idx]);
+    bullets[_idx] = NULL;
+  }
+
   void reload()
   {
+    for (int i = 0; i < maxBullets; i++)
+    {
+      if (bullets[i])
+      {
+        bullets[i] = NULL;
+      }
+    }
     bullet = 0;
   }
 
@@ -451,8 +689,8 @@ public:
         printf("%c", shooter[i][j]);
       }
     }
-    resetCursor();
     renderStatus();
+    resetCursor();
   }
 
   // Shooter Logic
@@ -467,7 +705,12 @@ public:
     {
       if (bullets[i])
       {
+        // printf("Rendering bullet : %d\n", i);
         bullets[i]->render();
+        if (bullets[i]->isEnemyIntersect() || bullets[i]->isOutsideMap())
+        {
+          removeBullet(i);
+        }
       }
     }
   }
@@ -542,57 +785,68 @@ public:
   }
 };
 
-Shooter shooter(1);
-
 //  Class NPC
 class NPC
 {
 public:
-  char *name;
+  char *type;
   int x;
   int y;
   char symbol;
+  bool ready = false;
 
-  NPC(int _x, int _y, char _symbol)
+  NPC(int _x, int _y, char _symbol, char *_type)
   {
+    strcpy(type, _type);
     x = _x;
     y = _y;
     symbol = _symbol;
     game.addSymbol(_x, _y, _symbol);
   }
-  void talk()
-  {
-    game.addText("Welcome to Weapon Dealer");
-    game.addText("Do you want to buy any weapon ? [y\\n]");
-  }
-};
 
-class WeaponDealer : public NPC
-{
-public:
-  WeaponDealer(int _x, int _y, char _symbol) : NPC(_x, _y, _symbol)
+  void yes()
   {
+    game.changeState(type);
+  }
+
+  bool checkType(char *_str)
+  {
+    return strcmp(type, _str) == 0;
   }
 
   void talk()
   {
-    game.addText("Welcome to Weapon Dealer");
-    game.addText("Do you want to buy any weapon ? [y\\n]");
+    ready = true;
+    if (checkType("npc_weapon"))
+    {
+      game.addText("Welcome to Weapon Dealer");
+      game.addText("Do you want to buy any weapon ? [y\\n]");
+    }
   }
 };
 
-int totalNpc;
-NPC **npcs = new NPC *[10];
-
-// Class Player
 class Player
 {
 
 public:
+  int level = 0;
+  int money = 0;
+  char *name = "Justine";
   NPC *npcAround;
   char symbol = 'P';
   int x = 3;
   int y = 10;
+
+  void printStatus()
+  {
+    printf("[%s]\n", name);
+    printf("Level : %d\n", level);
+    printf("Money : %d\n", money);
+  }
+
+  void renderStatus(int _x, int _y){
+    
+  }
 
   void move(char str)
   {
@@ -630,6 +884,10 @@ public:
         startGame();
       }
       break;
+    case 'y':
+      if (npcAround && npcAround->ready)
+        npcAround->yes();
+      break;
     }
   }
 
@@ -645,6 +903,7 @@ public:
 
       if (bottom || top || right || left)
       {
+        // npcs[i]->ready = false;
         npcAround = npcs[i];
         return true;
       }
@@ -676,24 +935,24 @@ public:
       strcpy(game.statusText, "Press SPACE to interact");
     }
   }
-};
-Player player;
+} player;
 
 void init()
 {
   game.loadLobby();
   game.loadGame();
 
-  *npcs = new WeaponDealer(16, 6, 'W');
+  npcs[0] = new NPC(16, 6, 'W', "npc_weapon");
   totalNpc = 1;
-
   forceCls();
 }
 
 int main()
 {
   init();
+  // printf("test");
   theGame();
+  return 0;
 }
 
 void theGame()
@@ -701,7 +960,6 @@ void theGame()
   render();
   while (true)
   {
-
     if (strcmp(game.state, "lobby") == 0)
     {
       char buffer = getch();
@@ -714,16 +972,14 @@ void theGame()
       if (kbhit())
       {
         char buffer = getch();
-        if (buffer == 'o')
-        {
-          spawnEnemy();
-        }
-        shooter.move(buffer);
-        shooter.logic();
+        shooter->move(buffer);
+        shooter->logic();
       }
-      Sleep(20);
+      spawnEnemyLogic();
       renderEnemy();
-      shooter.renderBullets();
+      renderEnemyBullets(new Node(shooter->x, shooter->y, shooter->w, shooter->h));
+      shooter->renderBullets();
+      Sleep(SLEEP_TIME);
     }
   }
 }
@@ -731,8 +987,11 @@ void theGame()
 void startGame()
 {
   forceCls();
+  myScore = new Score();
+  shooter = new Shooter(1);
   game.changeState("game");
   ui = new UI(8, 52);
+  myScore->renderUi();
   // shooter.renderStatus();
 }
 
@@ -787,7 +1046,7 @@ void renderLobby()
 
 bool isBlockIntersect(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2)
 {
-  if (x1 + w1 >= x2 && x1 <= x2 + w2 && y1 + h1 >= y2 && y2 <= y2 + h2)
+  if (y1 + w1 >= y2 && y1 <= y2 + w2 && x1 + h1 >= x2 && x2 <= x2 + h2)
   {
     return true;
   }
@@ -799,7 +1058,7 @@ bool isBlockIntersect(int x1, int y1, int w1, int h1, int x2, int y2, int w2, in
 
 bool isIntersect(int x, int y, int x2, int y2, int w2, int h2)
 {
-  if (x >= x2 && x <= x2 + w2 && y > y2 && y <= y2 + h2)
+  if (x >= x2 && y <= y2 + w2 && y >= y2 && x <= x2 + h2)
   {
     return true;
   }
@@ -809,11 +1068,21 @@ bool isIntersect(int x, int y, int x2, int y2, int w2, int h2)
   }
 }
 
+void spawnEnemyLogic()
+{
+  enemySpawnInterval += 1;
+  if (enemySpawnInterval >= maxEnemySpawnInterval)
+  {
+    enemySpawnInterval = 0;
+    spawnEnemy();
+  }
+}
+
 void spawnEnemy()
 {
   int x = 0;
   int y = randomInt(10, SIZE_GAME_Y - 10);
-  enemies[totalEnemy] = new Enemy(x, y);
+  enemies[totalEnemy] = new Enemy(x, y, 1, totalEnemy);
   totalEnemy += 1;
 }
 
@@ -821,7 +1090,10 @@ void renderEnemy()
 {
   for (int i = 0; i < totalEnemy; i++)
   {
-    enemies[i]->render();
+    if (enemies[i])
+    {
+      enemies[i]->render();
+    }
   }
 }
 
@@ -835,7 +1107,33 @@ void renderGame()
     }
     printf("\n");
   }
-  shooter.render();
+  shooter->render();
+}
+
+void removeEnemyBullet(int _idx)
+{
+  if (enemyBullets[_idx])
+  {
+    removeCoordinate(enemyBullets[_idx]->y, enemyBullets[_idx]->x);
+    // free(enemyBullets[_idx]);
+    enemyBullets[_idx] = NULL;
+  }
+}
+
+void renderEnemyBullets(Node *node)
+{
+  for (int i = 0; i < enemyBullet; i++)
+  {
+    if (enemyBullets[i])
+    {
+      enemyBullets[i]->render();
+      if (enemyBullets[i]->isPlayerIntersect(node) || enemyBullets[i]->isOutsideMap())
+      {
+        shooter->hit(enemyBullets[i]->damage);
+        removeEnemyBullet(i);
+      }
+    }
+  }
 }
 
 void render()
@@ -857,10 +1155,111 @@ void render()
   {
     renderGame();
   }
+  else if (strcmp(game.state, "npc_weapon") == 0)
+  {
+    renderWeaponShop();
+  }
+  else if (strcmp(game.state, "npc_item") == 0)
+  {
+  }
+  else if (strcmp(game.state, "npc_upgrade") == 0)
+  {
+  }
 }
+
+void renderWeaponShop()
+{
+  forceCls();
+  int idx = 0;
+  int max = menuWeaponShop();
+  int lastIdx = -1;
+  while (true)
+  {
+    char buffer = getch();
+
+    if (lastIdx != -1)
+    {
+      removeCoordinate(20, 1 + lastIdx);
+    }
+
+    if (buffer == 'w')
+    {
+      if (idx > 0)
+      {
+        idx -= 1;
+      }
+    }
+    else if (buffer == 's')
+    {
+      if (idx + 1 < max)
+      {
+        idx += 1;
+      }
+    }
+    else if (buffer == '\r')
+    {
+      chooseMenuWeapon(idx, max);
+      break;
+    }
+    lastIdx = idx;
+    makeCoordinate(20, 1 + idx, "<");
+  }
+  game.changeState("lobby");
+  render();
+}
+
+void chooseMenuWeapon(int _idx, int _max)
+{
+  switch (_idx)
+  {
+  case 0:
+    makeCoordinate(0, _max + 2, "You choose pistol!");
+    break;
+  case 1:
+    makeCoordinate(0, _max + 2, "You choose machinegun!");
+    break;
+  case 2:
+    makeCoordinate(0, _max + 2, "Exit!");
+    break;
+  }
+  return;
+}
+
+int menuWeaponShop()
+{
+  player.printStatus();
+  printf("\n");
+  printf("Welcome to weapon shop\n");
+  printf("1. Pistol\n");
+  printf("2. Machinegun\n");
+  printf("3. Exit\n");
+  return 3;
+}
+
 void forceCls()
 {
-  system("cls");
+  cls();
+  // clrscr();
+  // printf("SYSTEM CLEAR");
+  // system("cls");
+  // printf("TERCLEAR");
+  resetCursor();
+  for (int i = 0; i < 80; i++)
+    printf("%s", EMPTY_50);
+  resetCursor();
+}
+
+void clsCoordinate(int _x, int _y, int _w, int _h)
+{
+  for (int i = 0; i < _h; i++)
+  {
+    moveCursor(_x, _y + i);
+    for (int j = 0; j < _w; j++)
+    {
+      printf("%c");
+    }
+  }
+  resetCursor();
 }
 
 void cls()
@@ -893,6 +1292,13 @@ void removeCoordinate(int x, int y)
 {
   moveCursor(x, y);
   printf(" ");
+  resetCursor();
+}
+
+void makeCoordinate(int _x, int _y, char *_symbol)
+{
+  moveCursor(_x, _y);
+  printf("%s", _symbol);
   resetCursor();
 }
 
