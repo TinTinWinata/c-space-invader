@@ -413,7 +413,8 @@ public:
       myScore->renderUi();
 
       // Remove enemy to null
-      enemies[idx] = NULL;
+      if (enemies[idx])
+        enemies[idx] = NULL;
     }
   }
 
@@ -719,7 +720,7 @@ public:
   void hit(int damage)
   {
     hp -= damage;
-    if (hp <= 0)
+    if (hp <= 0 && GAME_IS_RUNNING)
     {
       hp = 0;
       finishGame();
@@ -1001,17 +1002,28 @@ public:
   // Ship
   int ship = 1;
 
-  int giveXp(int _xp)
+  int gainXp(int _xp)
   {
-    int lvl = _xp / MAX_XP_TO_LEVEL_UP;
-    xp = _xp % lvl;
-
-    level += lvl;
+    if (_xp > 0)
+    {
+      // ! Must validate score > 0
+      // ! (because in the levelup calculation can be infinity)
+      money += _xp;
+      int levelup = (_xp + xp) / MAX_XP_TO_LEVEL_UP;
+      int restXp = (levelup * MAX_XP_TO_LEVEL_UP) % _xp;
+      xp = restXp;
+      levelUp(levelup);
+      return levelup;
+    }
+    return 0;
+  }
+  void levelUp(int _level)
+  {
+    level += _level;
     if (level >= MAX_PLAYER_LVL)
     {
       level = MAX_PLAYER_LVL;
     }
-    return level;
   }
 
   void openBackpack()
@@ -1216,32 +1228,30 @@ void finishGame()
 {
 
   GAME_IS_RUNNING = false;
+  game.changeState("lobby");
+  game.nextForceCLS();
 
   // Delete all enemies
   totalEnemy = 0;
-
-  // delete[] enemies;
+  delete[] enemies;
 
   // Calculate Level
   int score = myScore->score;
-  player.money += score;
-  // int lvl = player.giveXp(score);
-  // delete myScore;
-  forceCls();
-  printFinishGame(score, 30);
-  getchar();
+  player.gainXp(score);
 
-  game.changeState("lobby");
-  render();
+  forceCls();
+  printFinishGame(score, player.level);
+  printf("\n\tContinue Game [press enter]\n");
+  return;
 }
 
 void printFinishGame(int _score, int _level)
 {
-  printf("C Space Invader\n");
-  printf("------------------\n");
-  printf("Your score : %d\n", _score);
-  printf("Your current level : %d\n", _level);
-  printf("\n[press enter]\n");
+  printf("\n\tC Space Invader\n");
+  printf("\t------------------\n");
+  printf("\tYour score : %d\n", _score);
+  printf("\tYou gain %d exp\n", _score);
+  printf("\tYour current level is : %d", _level);
 }
 
 void startGame()
@@ -1402,11 +1412,12 @@ void renderEnemyBullets(Node *node)
 {
   for (int i = 0; i < enemyBullet; i++)
   {
-    if (enemyBullets[i] != NULL)
+    if (enemyBullets[i] != NULL && GAME_IS_RUNNING)
     {
       enemyBullets[i]->render();
       if (enemyBullets[i]->isPlayerIntersect(node))
       {
+        getchar();
         shooter->hit(enemyBullets[i]->damage);
         removeEnemyBullet(i);
       }
