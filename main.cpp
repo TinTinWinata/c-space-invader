@@ -857,6 +857,9 @@ public:
     saveLastNode();
     switch (str)
     {
+    case 'q':
+      finishGame();
+      break;
     case 'r':
       reload();
       break;
@@ -1232,8 +1235,8 @@ void finishGame()
   game.nextForceCLS();
 
   // Delete all enemies
-  totalEnemy = 0;
-  delete[] enemies;
+  // totalEnemy = 0;
+  // delete[] enemies;
 
   // Calculate Level
   int score = myScore->score;
@@ -1257,6 +1260,8 @@ void printFinishGame(int _score, int _level)
 void startGame()
 {
   forceCls();
+
+  totalEnemy = 0;
 
   if (myScore)
     delete myScore;
@@ -1417,7 +1422,6 @@ void renderEnemyBullets(Node *node)
       enemyBullets[i]->render();
       if (enemyBullets[i]->isPlayerIntersect(node))
       {
-        getchar();
         shooter->hit(enemyBullets[i]->damage);
         removeEnemyBullet(i);
       }
