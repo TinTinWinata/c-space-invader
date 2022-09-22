@@ -9,9 +9,14 @@
 const int TOTAL_TEXT = 3;
 const int MAX_UI_TEXT = 10;
 const int MAX_ENEMY = 255;
-const int SLEEP_TIME = 20;
 const int MAX_BULLET = 255;
 const int LOBBY_STATUS_COORDINATE_X = SIZE_LOBBY_Y + 4;
+const int ENEMY_COOLDOWN = 2000; // milliseconds
+const int ENEMY_MOVEMENT_INTERVAL = 3000;
+const int ENEMY_SPAWN_PER_WAVE = 3;
+const int ENEMY_SHOOT_INTERVAL = 2000;
+const int MAX_XP_TO_LEVEL_UP = 100;
+const int MAX_PLAYER_LVL = 100;
 
 // Price Item Variable
 const int POTION_PRICE = 5;
@@ -29,9 +34,9 @@ const int MAX_HP = 300;
 const int MAX_ENERGY = 500;
 const int MAX_ARMOR = 30;
 const int MAX_DAMAGE = 10;
-const int ENEMY_COOLDOWN = 2000; // milliseconds
 
 // Function Prototype List
+void printFinishGame(int _score, int _level);
 void arraySetSpace(char _arr[255][255], int _w, int _h);
 void printSpace(int _idx);
 void loadSprite(char *_filename, char sprite[255][255]);
@@ -42,6 +47,7 @@ void resetCursor();
 void cls();
 void clsCoordinate(int _x, int _y, int _w, int _h);
 void forceCls();
+void finishGame();
 void menuWeaponShop(int _idx);
 void chooseMenuWeapon(int _idx, int _max);
 void renderWeaponShop();
@@ -50,7 +56,6 @@ void renderEnemyBullets(Node *node);
 void removeEnemyBullet(int _idx);
 void renderGame();
 void renderEnemy();
-void spawnEnemy();
 void spawnEnemyLogic();
 bool isIntersect(int x, int y, int x2, int y2, int w2, int h2);
 bool isBlockIntersect(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2);
@@ -69,6 +74,7 @@ int choosedBuyMenu(int _price, char _name[255]);
 void renderUpgradeShop();
 bool chooseMenuUpgrade(int _idx, int _max);
 bool chooseUpgradeMenu(int _price, int _max, int _base);
+void checkMovementEnemy();
 
 // Class Prototype List
 class Enemy;
@@ -84,11 +90,16 @@ class PlayerBullet;
 
 // Variable List
 
+int SLEEP_TIME = 20;
+
 int totalEnemy = 0;
 int totalNpc = 0;
 int enemySpawnInterval = 0;
 int maxEnemySpawnInterval = ENEMY_COOLDOWN / SLEEP_TIME;
 int enemyBullet = 0;
+int enemyMovementInterval = 0;
+int maxEnemyMovementInterval = ENEMY_MOVEMENT_INTERVAL / SLEEP_TIME;
+bool GAME_IS_RUNNING = false;
 
 Enemy **enemies = new Enemy *[MAX_ENEMY];
 UI *ui = NULL;
@@ -160,7 +171,6 @@ public:
   int uiIdx = 2;
   Score()
   {
-    printf("Newing score...");
     score = 0;
   }
 
@@ -188,7 +198,7 @@ public:
     ui->renderAll();
   }
 
-  int get()
+  int getScore()
   {
     return score;
   }
@@ -197,6 +207,7 @@ public:
 class Bullet
 {
 public:
+  bool dead = false;
   int idx;
   int x;
   int y;
@@ -217,11 +228,6 @@ public:
     vy = _vy;
   }
 
-  Bullet(char _symbol)
-  {
-    symbol = _symbol;
-  }
-
   bool isOutsideMap()
   {
     if (x <= 0 || x >= SIZE_GAME_X - 2 || y <= 1 || y >= SIZE_GAME_Y - 1)
@@ -238,10 +244,6 @@ public:
 
   void remove()
   {
-    if (lastNode)
-    {
-      removeCoordinate(lastNode->y, lastNode->x);
-    }
     removeCoordinate(y, x);
   }
 
@@ -250,6 +252,7 @@ public:
     if (lastNode)
     {
       removeCoordinate(y, x);
+      delete lastNode;
     }
     lastNode = new Node(x, y);
     x += vx;
@@ -257,6 +260,8 @@ public:
 
   void render()
   {
+    if (dead)
+      return;
     logic();
     moveCursor(y, x);
     printf("%c", symbol);
@@ -270,6 +275,8 @@ public:
   EnemyBullet(int _x, int _y, char _symbol, int _idx, int _vx, int _vy, int _damage) : Bullet(_x, _y, _symbol, _idx, _vx, _vy, _damage){};
   bool isPlayerIntersect(Node *node)
   {
+    if (dead)
+      return false;
     if (shooter && isIntersect(x, y, node->x, node->y, node->w, node->h))
     {
       // Player Intersect
@@ -298,13 +305,14 @@ public:
   int idx = -1;
 
   int shootInterval = 0;
-  int maxShootInterval = 200;
+  int maxShootInterval = ENEMY_SHOOT_INTERVAL / SLEEP_TIME;
 
   // Movement Speed =  (Sleep Time * Max Interval)
   // If 10, enemy will move 200 milliseconds
 
   int interval = 0;
   int maxInterval = 100;
+  bool left = false;
 
   Node *lastNode;
 
@@ -313,9 +321,39 @@ public:
     idx = _idx;
     x = _x;
     y = _y;
+    char text[255];
+    sprintf(text, "enemy_%d.txt", _level);
+    loadSprite(text, sprite);
+
     if (_level == 1)
     {
-      loadSprite("enemy.txt", sprite);
+      damage = 10;
+    }
+    else if (_level == 2)
+    {
+      damage = 20;
+    }
+    else if (_level == 3)
+    {
+      damage = 25;
+    }
+  }
+
+  void move()
+  {
+    if (left)
+    {
+      left = false;
+
+      // go right
+      y += 1;
+    }
+    else
+    {
+      left = true;
+
+      // go left
+      y -= 1;
     }
   }
 
@@ -358,6 +396,9 @@ public:
   void hit(int dmg)
   {
     hp -= dmg;
+    char text[255];
+    // sprintf(text, "hitted : %d hp %d damage", hp, dmg);
+    // debug(text);
     if (hp <= 0)
     {
       // Remove Last Node
@@ -603,9 +644,11 @@ public:
 class PlayerBullet : public Bullet
 {
 public:
-  PlayerBullet(int _x, int _y, char _symbol, int _idx, int _vx, int _vy) : Bullet(_x, _y, _symbol, _idx, _vx, _vy, damage){};
+  PlayerBullet(int _x, int _y, char _symbol, int _idx, int _vx, int _vy, int _damage) : Bullet(_x, _y, _symbol, _idx, _vx, _vy, _damage){};
   bool isEnemyIntersect()
   {
+    if (dead)
+      return false;
     for (int i = 0; i < totalEnemy; i++)
     {
       if (enemies[i] && isIntersect(x, y, enemies[i]->x, enemies[i]->y, enemies[i]->w, enemies[i]->h))
@@ -635,14 +678,15 @@ public:
   char shooter[255][255];
   char bulletSymbol = '^';
   int bullet = 0;
-  bool dead = false;
+  int damage = 1;
+  int type;
 
   Shooter(int level)
   {
     char fileName[255];
     sprintf(fileName, "space_%d.txt", level);
     loadPlayer(fileName);
-
+    type = level - 1;
     switch (level)
     {
     case 1:
@@ -677,9 +721,13 @@ public:
     hp -= damage;
     if (hp <= 0)
     {
-      dead = true;
+      hp = 0;
+      finishGame();
     }
-    renderStatus();
+    else
+    {
+      renderStatus();
+    }
   }
 
   void saveLastNode()
@@ -690,7 +738,8 @@ public:
   void shoot()
   {
     bullets[bullet] = new PlayerBullet(x, (y + w / 2), bulletSymbol,
-                                       bullet, -1, 0);
+                                       bullet, -1, 0, damage);
+
     bullet += 1;
   }
 
@@ -707,6 +756,11 @@ public:
     char bulletText[255];
     sprintf(bulletText, "Bullets %.2d/%.2d", maxBullets - bullet, maxBullets);
     ui->addText(1, bulletText);
+
+    // Status Name
+    char shipText[255];
+    sprintf(shipText, "%s", SPACESHIP_NAME[type - 1]);
+    ui->addText(3, shipText);
 
     // Health
     ui->cleanText(6);
@@ -728,18 +782,17 @@ public:
   void removeBullet(int _idx)
   {
     removeCoordinate(bullets[_idx]->y, bullets[_idx]->x);
-    // free(bullets[_idx]);
-    bullets[_idx] = NULL;
+    bullets[_idx]->dead = true;
+    // bullets[_idx] = NULL;
   }
 
   void reload()
   {
-    for (int i = 0; i < maxBullets; i++)
+    for (int i = 0; i < bullet; i++)
     {
-      if (bullets[i])
-      {
-        bullets[i]->remove();
-      }
+      char text[255];
+      bullets[i]->remove();
+      delete bullets[i];
     }
     bullet = 0;
   }
@@ -923,7 +976,8 @@ class Player
 {
 public:
   // Main Attributess
-  int level = 0;
+  int xp = 0;
+  int level = 1;
   int money = 0;
   char name[255] = "Justine";
   NPC *npcAround;
@@ -946,6 +1000,19 @@ public:
 
   // Ship
   int ship = 1;
+
+  int giveXp(int _xp)
+  {
+    int lvl = _xp / MAX_XP_TO_LEVEL_UP;
+    xp = _xp % lvl;
+
+    level += lvl;
+    if (level >= MAX_PLAYER_LVL)
+    {
+      level = MAX_PLAYER_LVL;
+    }
+    return level;
+  }
 
   void openBackpack()
   {
@@ -1092,7 +1159,7 @@ void init()
 
   npcs[0] = new NPC(4, 26, 'W', "npc_weapon");
   npcs[1] = new NPC(16, 27, 'I', "npc_item");
-  npcs[2] = new NPC(16, 6, 'P', "npc_upgrade");
+  npcs[2] = new NPC(16, 6, 'U', "npc_upgrade");
 
   totalNpc = 3;
 
@@ -1125,12 +1192,16 @@ void theGame()
         shooter->move(buffer);
         shooter->logic();
       }
-      spawnEnemyLogic();
 
-      renderEnemy();
-      renderEnemyBullets(new Node(shooter->x, shooter->y, shooter->w, shooter->h));
-      shooter->renderBullets();
-      Sleep(SLEEP_TIME);
+      if (GAME_IS_RUNNING)
+      {
+        spawnEnemyLogic();
+        renderEnemy();
+        renderEnemyBullets(new Node(shooter->x, shooter->y, shooter->w, shooter->h));
+        shooter->renderBullets();
+        checkMovementEnemy();
+        Sleep(SLEEP_TIME);
+      }
     }
   }
 }
@@ -1141,23 +1212,62 @@ void debug(char *str)
   getchar();
 }
 
+void finishGame()
+{
+
+  GAME_IS_RUNNING = false;
+
+  // Delete all enemies
+  totalEnemy = 0;
+
+  // delete[] enemies;
+
+  // Calculate Level
+  int score = myScore->score;
+  player.money += score;
+  // int lvl = player.giveXp(score);
+  // delete myScore;
+  forceCls();
+  printFinishGame(score, 30);
+  getchar();
+
+  game.changeState("lobby");
+  render();
+}
+
+void printFinishGame(int _score, int _level)
+{
+  printf("C Space Invader\n");
+  printf("------------------\n");
+  printf("Your score : %d\n", _score);
+  printf("Your current level : %d\n", _level);
+  printf("\n[press enter]\n");
+}
+
 void startGame()
 {
   forceCls();
 
+  if (myScore)
+    delete myScore;
+
   myScore = new Score();
 
   if (shooter)
-  {
-    // Reclear Shooter
     delete shooter;
-  }
+  // Reclear Shooter
+
   // Create new instance shooter
   shooter = new Shooter(player.ship);
 
   game.changeState("game");
+
+  if (ui)
+    delete ui;
+
   ui = new UI(8, 52);
   myScore->renderUi();
+  GAME_IS_RUNNING = true;
 }
 
 void renderLobby()
@@ -1225,17 +1335,33 @@ void spawnEnemyLogic()
   enemySpawnInterval += 1;
   if (enemySpawnInterval >= maxEnemySpawnInterval)
   {
+    // Spawn Enemy already 3 seconds
     enemySpawnInterval = 0;
-    spawnEnemy();
+
+    int x = 0;
+    int y = randomInt(3, SIZE_GAME_Y - (ENEMY_WIDTH * ENEMY_SPAWN_PER_WAVE) - 2);
+
+    for (int i = 0; i < ENEMY_SPAWN_PER_WAVE; i++)
+    {
+      int randomLvl = randomInt(1, 3);
+      enemies[totalEnemy] = new Enemy(x, y + (i * ENEMY_SPAWN_PER_WAVE), randomLvl, totalEnemy);
+      totalEnemy += 1;
+    }
   }
 }
 
-void spawnEnemy()
+void checkMovementEnemy()
 {
-  int x = 0;
-  int y = randomInt(10, SIZE_GAME_Y - 10);
-  enemies[totalEnemy] = new Enemy(x, y, 1, totalEnemy);
-  totalEnemy += 1;
+  enemyMovementInterval += 1;
+  if (enemyMovementInterval >= maxEnemyMovementInterval)
+  {
+    enemyMovementInterval = 0;
+    for (int i = 0; i < totalEnemy; i++)
+    {
+      if (enemies[i])
+        enemies[i]->move();
+    }
+  }
 }
 
 void renderEnemy()
@@ -1276,12 +1402,16 @@ void renderEnemyBullets(Node *node)
 {
   for (int i = 0; i < enemyBullet; i++)
   {
-    if (enemyBullets[i])
+    if (enemyBullets[i] != NULL)
     {
       enemyBullets[i]->render();
-      if (enemyBullets[i]->isPlayerIntersect(node) || enemyBullets[i]->isOutsideMap())
+      if (enemyBullets[i]->isPlayerIntersect(node))
       {
         shooter->hit(enemyBullets[i]->damage);
+        removeEnemyBullet(i);
+      }
+      else if (enemyBullets[i]->isOutsideMap())
+      {
         removeEnemyBullet(i);
       }
     }
@@ -1293,6 +1423,7 @@ void render()
   if (game.forceClsFlag)
   {
     forceCls();
+    game.forceClsFlag = false;
   }
   else
   {
@@ -1577,27 +1708,27 @@ void printSpace(int _idx)
     h = SPACE_1_H;
     arraySetSpace(item, w, h);
     loadSprite("space_1.txt", item);
-    printf("   Default Spaceship\n\n");
+    printf("   %s\n\n", SPACESHIP_NAME[_idx]);
     break;
   case 1:
     w = SPACE_2_W;
     h = SPACE_2_H;
     arraySetSpace(item, w, h);
-    printf("    Great Spaceship\n\n");
+    printf("    %s\n\n", SPACESHIP_NAME[_idx]);
     loadSprite("space_2.txt", item);
     break;
   case 2:
     w = SPACE_3_W;
     h = SPACE_3_H;
     arraySetSpace(item, w, h);
-    printf("  Little Spaceship\n\n");
+    printf("  %s\n\n", SPACESHIP_NAME[_idx]);
     loadSprite("space_3.txt", item);
     break;
   case 3:
     w = SPACE_4_W;
     h = SPACE_4_H;
     arraySetSpace(item, w, h);
-    printf("    Rocket Spaceship\n\n");
+    printf("    %s\n\n", SPACESHIP_NAME[_idx]);
     loadSprite("space_4.txt", item);
     break;
   }

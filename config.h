@@ -23,6 +23,11 @@ const int SPACE_4_H = 5;
 
 const int TOTAL_SPACE = 4;
 
+const int ENEMY_WIDTH = 3;
+
+const char SPACESHIP_NAME[TOTAL_SPACE][255] = {
+    {"Default Spaceship"}, {"Great Spaceship"}, {"Little Spaceship"}, {"Rocket Spaceship"}};
+
 void PRINT_EMPTY()
 {
   printf("%s", EMPTY_SPACE);

@@ -1,2 +1,2 @@
 
-class NPC;
+  // int lvl = player.giveXp(score);
