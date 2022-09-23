@@ -25,6 +25,8 @@ const int TOTAL_SPACE = 4;
 
 const int ENEMY_WIDTH = 3;
 
+const int AREA[3] = {1, -1, 0};
+
 const char SPACESHIP_NAME[TOTAL_SPACE][255] = {
     {"Default Spaceship"}, {"Great Spaceship"}, {"Little Spaceship"}, {"Rocket Spaceship"}};
 

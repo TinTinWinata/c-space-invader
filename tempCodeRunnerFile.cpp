@@ -1,2 +1,2 @@
 
-  // int lvl = player.giveXp(score);
+        printf("DATA : %s", data);
