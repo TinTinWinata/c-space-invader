@@ -1,2 +1,1 @@
-
-const int MAX_ENEMY = 255;
+d preventing an invasion  Amassing a high score is a further\n\t objecti

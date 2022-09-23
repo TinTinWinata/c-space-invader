@@ -19,6 +19,7 @@ const int ENEMY_SHOOT_INTERVAL = 2000;
 const int MAX_XP_TO_LEVEL_UP = 100;
 const int MAX_PLAYER_LVL = 100;
 const int LOADING_TIME = 1000;
+const int NEED_LEVEL_TO_OPEN_SPACESHIP = 10;
 
 // Price Item Variable
 const int POTION_PRICE = 5;
@@ -42,7 +43,9 @@ const int POTION_HP_INCREMENT = 50;
 const int ENERGY_DRINK_INCREMENT = 50;
 
 // Function Prototype List
-void printLobby(int _x, int _y);
+void printSetting(int _x, int _y);
+void printHowToPlay(int _x, int _y);
+void playSound(char str[255]);
 void chooseMenu(int _x, int _y);
 void endScreen();
 void makeCharCoordinate(int _x, int _y, char _symbol);
@@ -87,6 +90,7 @@ bool chooseMenuUpgrade(int _idx, int _max);
 bool chooseUpgradeMenu(int _price, int _max, int _base);
 void checkMovementEnemy();
 void useItem(char str[255]);
+bool isSpaceshipOpen();
 
 // Class Prototype List
 class Enemy;
@@ -114,6 +118,7 @@ int enemyBullet = 0;
 int enemyMovementInterval = 0;
 int maxEnemyMovementInterval = ENEMY_MOVEMENT_INTERVAL / SLEEP_TIME;
 bool GAME_IS_RUNNING = false;
+bool GAME_STARTING_FLAG = false;
 
 Enemy **enemies = new Enemy *[MAX_ENEMY];
 UI *ui = NULL;
@@ -191,9 +196,13 @@ class Score
 public:
   int score = 0;
   int uiIdx = 2;
+  char allName[255][255];
+  char allScore[255];
+  int allIdx = 0;
   Score()
   {
     score = 0;
+    load();
   }
 
   void increment(int _score)
@@ -206,9 +215,132 @@ public:
     score = 0;
   }
 
+  // Load Score
+  void load()
+  {
+    char line[255];
+    FILE *fp;
+    fp = fopen("score.dat", "r");
+    if (fp == NULL)
+    {
+      printf("Missing score.dat files ! [press enter]");
+      getchar();
+      exit(1);
+      return;
+    }
+
+    while (fgets(line, 255, fp))
+    {
+      char *data = strtok(line, "#");
+      int idx = 0;
+      while (data != NULL)
+      {
+        if (idx == 0)
+        {
+          // Get name
+          strcpy(allName[allIdx], data);
+        }
+        else if (idx == 1)
+        {
+          int currScore = strtol(data, NULL, 10);
+          allScore[allIdx] = currScore;
+          // Get Score
+        }
+        idx += 1;
+        data = strtok(NULL, "#");
+      };
+      allIdx += 1;
+    }
+    fclose(fp);
+  }
+
+    for (int i = 0; i < allIdx - 1; i++)
+    {
+      for (int j = 0; j < allIdx - i - 1; j++)
+      {
+        if (allScore[j] < allScore[j + 1])
+        {
+
+          // Swap Score
+          int tempScore = allScore[j];
+          allScore[j] = allScore[j + 1];
+          allScore[j + 1] = tempScore;
+
+          // Swap Name
+          char tempName[255];
+          strcpy(tempName, allName[j]);
+          strcpy(allName[i], allName[j + 1]);
+          strcpy(allName[j + 1], tempName);
+        }
+      }
+    }
+  }
+
+  // Highscore Print
+  void print()
+  {
+    printf("\n\tC Space Invader Scoreboard\n\n");
+    if (allIdx == 0)
+    {
+      printf("\n\tThere's no other competitor!\n");
+      return;
+    }
+
+    sort();
+
+    for (int i = 0; i < allIdx; i++)
+    {
+      printf("\t%d. %s | %d\n", i + 1, allName[i], allScore[i]);
+    }
+  }
+
   void save()
   {
-    // TODO: Save Current Score to highscore.txt
+    FILE *fp;
+    fp = fopen("score.dat", "w");
+    if (fp == NULL)
+    {
+      printf("Missing score.dat files ! [press enter]");
+      getchar();
+      exit(1);
+      return;
+    }
+    for (int i = 0; i < allIdx; i++)
+    {
+      char text[255];
+      sprintf(text, "%s#%d\n", allName[i], allScore[i]);
+      fprintf(fp, text);
+    }
+    fclose(fp);
+  }
+
+  void insert(int _score, char _name[255])
+  {
+
+    bool isFound = false;
+    for (int i = 0; i < allIdx; i++)
+    {
+      if (strcmp(allName[i], _name) == 0)
+      {
+        // printf("Found! %s changing to %d", name, _score);
+        // getchar();
+        // Is found just update the score
+        if (allScore[i] < _score)
+        {
+          allScore[i] = _score;
+        }
+        isFound = true;
+        return;
+      }
+    }
+    if (!isFound)
+    {
+      // If not found make another var
+      strcpy(allName[allIdx], _name);
+      allScore[allIdx] = _score;
+      allIdx += 1;
+    }
+    sort();
   }
 
   void renderUi()
@@ -607,6 +739,27 @@ public:
     skipBufferFlag = true;
   }
 
+  void checkShopOpen()
+  {
+    bool flag = isSpaceshipOpen();
+    if (flag)
+    {
+      LOBBY_ARENA[6][6] = ' ';
+      LOBBY_ARENA[6][7] = ' ';
+      LOBBY_ARENA[6][8] = ' ';
+      LOBBY_ARENA[6][9] = ' ';
+      LOBBY_ARENA[7][5] = '/';
+      LOBBY_ARENA[7][10] = '\\';
+    }
+    else
+    {
+      LOBBY_ARENA[6][6] = '-';
+      LOBBY_ARENA[6][7] = '-';
+      LOBBY_ARENA[6][8] = '-';
+      LOBBY_ARENA[6][9] = '-';
+    }
+  }
+
   void printText(int _x, int _y)
   {
     for (int j = 0; j < TOTAL_TEXT; j++)
@@ -621,11 +774,13 @@ public:
         continue;
       }
 
-      // If exists Print the text
+      // If exists Print the status text
+
       int len = strlen(text[j]);
       for (int k = 0; k < len; k++)
       {
-        Sleep(20);
+        playSound("typing");
+        // Sleep(20);
         printf("%c", text[j][k]);
       }
     }
@@ -634,10 +789,6 @@ public:
 
   void changeState(char _state[255])
   {
-    if (strcmp(_state, "lobby") == 0)
-    {
-      printLobby(0, 0);
-    }
     strcpy(state, _state);
   }
 
@@ -750,7 +901,7 @@ public:
 
   bool isIntersect(int x, int y)
   {
-    if (isLobby() && (LOBBY_ARENA[x][y] == ' ' || LOBBY_ARENA[x][y] == '-'))
+    if (isLobby() && LOBBY_ARENA[x][y] == ' ')
     {
       return true;
     }
@@ -901,8 +1052,13 @@ public:
     y = SIZE_GAME_Y / 2 - w;
   }
 
+  // Shooter Hit
   void hit(int damage)
   {
+    // Calculate Damage with Armor Protection
+    int armorProtection = randomInt(0, armor);
+    damage -= armorProtection;
+
     hp -= damage;
     if (hp <= 0 && GAME_IS_RUNNING)
     {
@@ -943,8 +1099,10 @@ public:
     }
   }
 
+  // Shooter Shoot
   void shoot()
   {
+    // Beep(500, 10);
     bullets[bullet] = new PlayerBullet(x - 1, (y + w / 2), bulletSymbol,
                                        bullet, -1, 0, damage);
 
@@ -1256,8 +1414,6 @@ public:
   // Ship
   int ship = 1;
 
-  Node *lastNode;
-
   void reset()
   {
     xp = 0;
@@ -1355,6 +1511,15 @@ public:
     }
   }
 
+  void openLeaderboard()
+  {
+    forceCls();
+    myScore->print();
+    printf("\n\tBack to menu ? [press enter]");
+    getchar();
+    return;
+  }
+
   void openBackpack()
   {
     forceCls();
@@ -1377,15 +1542,7 @@ public:
     return;
   }
 
-  void printStatus(int _x, int _y)
-  {
-    moveCursor(_x, _y);
-    printf("%s", game.statusText);
-    strcpy(game.statusText, EMPTY_50);
-    resetCursor();
-  }
-
-  int printGameStatus(int _x, int _y)
+  int printStatus(int _x, int _y)
   {
     moveCursor(_x, _y);
     printf("[%s]", name);
@@ -1405,6 +1562,7 @@ public:
     return 3;
   }
 
+  // Player Move
   void move(char str)
   {
     switch (str)
@@ -1412,33 +1570,25 @@ public:
     case 'w':
       if (game.isIntersect(x - 1, y))
       {
-        removeCoordinate(y, x);
         x -= 1;
-        makeCharCoordinate(y, x, symbol);
       }
       break;
     case 'd':
       if (game.isIntersect(x, y + 1))
       {
-        removeCoordinate(y, x);
         y += 1;
-        makeCharCoordinate(y, x, symbol);
       }
       break;
     case 's':
       if (game.isIntersect(x + 1, y))
       {
-        removeCoordinate(y, x);
         x += 1;
-        makeCharCoordinate(y, x, symbol);
       }
       break;
     case 'a':
       if (game.isIntersect(x, y - 1))
       {
-        removeCoordinate(y, x);
         y -= 1;
-        makeCharCoordinate(y, x, symbol);
       }
       break;
     case ' ':
@@ -1446,11 +1596,16 @@ public:
         npcAround->talk();
       if (isInPortal())
       {
+
         startGame();
       }
       if (isInExitPortal())
       {
         exitGame();
+      }
+      if (isOnLeaderboard())
+      {
+        openLeaderboard();
       }
       break;
     case 'y':
@@ -1461,6 +1616,18 @@ public:
       openBackpack();
       break;
     }
+  }
+
+  bool isOnLeaderboard()
+  {
+    for (int i = 0; i < 3; i++)
+    {
+      if (x == 9 + i && y == 5)
+      {
+        return true;
+      }
+    }
+    return false;
   }
 
   bool isAroundNPC()
@@ -1511,8 +1678,6 @@ public:
     }
   }
 
-  //  Player Render
-
   // Player Logic
   void logic()
   {
@@ -1527,6 +1692,10 @@ public:
     if (isInPortal())
     {
       strcpy(game.statusText, "Press SPACE to interact");
+    }
+    if (isOnLeaderboard())
+    {
+      strcpy(game.statusText, "Press SPACE to see Leaderboard");
     }
   }
 };
@@ -1561,13 +1730,14 @@ public:
     fclose(fp);
   }
 
-  void print(int _x, int _y)
+  int print(int _x, int _y)
   {
     for (int i = 0; i < totalPlayer; i++)
     {
       moveCursor(_x, _y + i);
       printf("%d. %s [Level : %d]\n", i + 1, players[i]->name, players[i]->level);
     }
+    return totalPlayer;
   }
 
   void load(int i)
@@ -1648,6 +1818,8 @@ public:
 
 void init()
 {
+  myScore = new Score();
+
   data = new Data();
   data->load();
   srand(time(0));
@@ -1672,7 +1844,8 @@ void loading(int _n, int _x, int _y)
     for (int j = 0; j < 4; j++)
     {
       makeCharCoordinate(_x, _y, symbol[j]);
-      Sleep(100);
+      // Sleep(100);
+      playSound("loading");
     }
   }
 }
@@ -1684,7 +1857,11 @@ int printStartMenu(int _x, int _y)
   printf("NEW GAME");
   moveCursor(_x, _y + 1);
   printf("LOAD GAME");
-  return 2;
+  moveCursor(_x, _y + 2);
+  printf("SETTING");
+  moveCursor(_x, _y + 3);
+  printf("HOW TO PLAY");
+  return 4;
 }
 
 void insertNewName(int _x, int _y)
@@ -1718,26 +1895,55 @@ bool loadGame(int _x, int _y)
 
   moveCursor(_x, _y);
   printf("Save Data : ");
-  data->print(_x, _y + 1);
+  int max = data->print(_x, _y + 1);
 
   moveCursor(_x, _y + 1 + data->totalPlayer);
   printf("%d. Back", data->totalPlayer + 1);
-  int idx = 0;
-  do
-  {
-    clsCoordinate(_x, _y + 3 + data->totalPlayer, 50, 1);
-    moveCursor(_x, _y + 3 + data->totalPlayer);
-    idx = scanIndex("Choose : ");
-  } while (idx < 1 || idx > data->totalPlayer + 1);
 
-  if (idx == data->totalPlayer + 1)
+  int idx = 0;
+  int offset = 30;
+  int lastIdx = idx;
+  while (true)
+  {
+    if (lastIdx != idx)
+    {
+      removeCoordinate(_x + offset, _y + 1 + lastIdx);
+    }
+    makeCoordinate(_x + offset, _y + 1 + idx, "<");
+    char buffer = getch();
+    lastIdx = idx;
+    playSound("choose");
+    if (buffer == 'w')
+      idx -= 1;
+    else if (buffer == 's')
+      idx += 1;
+    else if (buffer == '\r')
+      break;
+
+    if (idx > max)
+    {
+      idx = max;
+    }
+    else if (idx < 0)
+    {
+      idx = 0;
+    }
+  };
+  // do
+  // {
+  //   clsCoordinate(_x, _y + 3 + data->totalPlayer, 50, 1);
+  //   moveCursor(_x, _y + 3 + data->totalPlayer);
+  //   idx = scanIndex("Choose : ");
+  // } while (idx < 1 || idx > data->totalPlayer + 1);
+
+  if (idx == max)
   {
     // Back
     return false;
   }
   else
   {
-    data->load(idx - 1);
+    data->load(idx);
     return true;
   }
 }
@@ -1755,6 +1961,7 @@ void chooseMenu(int _x, int _y)
     if (lastIdx != idx)
       removeCoordinate(_x + offsetX, _y + lastIdx);
     char buffer = getch();
+    playSound("choose");
     lastIdx = idx;
     if (buffer == 's')
     {
@@ -1792,6 +1999,58 @@ void chooseMenu(int _x, int _y)
       chooseMenu(_x, _y);
     }
   }
+  else if (idx == 2)
+  {
+    // Setting
+    forceCls();
+    printSetting(_x, _y);
+    printf("\n\tBack to menu ? [press enter]");
+    getchar();
+    chooseMenu(_x, _y);
+  }
+  else if (idx == 3)
+  {
+    // Setting
+    forceCls();
+    printHowToPlay(_x, _y);
+    printf("\n\tBack to menu ? [press enter]");
+    getchar();
+    chooseMenu(_x, _y);
+  }
+}
+
+void printHowToPlay(int _x, int _y)
+{
+  puts("\n\n\tSpace Invader\n\n");
+  puts("\tThe object of the game is, basically, to shoot the invaders with your shooter \n\twhile avoiding their shots and preventing an invasion  Amassing a high score is a further\n\tobjective and one that must be prioritised against your continued survival.");
+  puts("\n\n\tThere is no time limit,\n\texcept for the fact that if you do not shoot them all before they reach\n\tthe bottom of the screen the game ends.");
+  puts("\n\n\tCredit : TinTin Winata");
+}
+
+void printSetting(int _x, int _y)
+{
+  puts("\n\n\tWelcome to the game!");
+
+  puts("\n\tBasic Movement");
+  puts("\t'w' - Move Up");
+  puts("\t'a' - Move Left");
+  puts("\t's' - Move Down");
+  puts("\t'd' - Move Right");
+
+  puts("\n\tLobby Arena");
+
+  puts("\t'SPACE' - Intersect");
+  puts("\t'y' - Talk");
+  puts("\t'o' - Open Backpack");
+  puts("\n\tGame Arena");
+  puts("\t'SPACE' - Shoot");
+  puts("\t'r' - Reload");
+  puts("\t'f' - Skill");
+  puts("\t'1' - Use Potion");
+  puts("\t'2' - Use Max Potion");
+  puts("\t'3' - Use Energy");
+  puts("\t'4' - Use Max Energy");
+  puts("\t'g' - Use Bomb");
 }
 
 void loadingGame(int _x, int _y)
@@ -1843,7 +2102,6 @@ void theGame()
     }
     else if (strcmp(game.state, "game") == 0)
     {
-
       if (GAME_IS_RUNNING)
       {
         shooter->logic();
@@ -1853,6 +2111,7 @@ void theGame()
         shooter->renderBullets();
         checkMovementEnemy();
         Sleep(SLEEP_TIME);
+        // playSound("game");
       }
 
       if (kbhit())
@@ -1860,6 +2119,11 @@ void theGame()
         char buffer = getch();
         shooter->move(buffer);
         shooter->render();
+      }
+      if (GAME_STARTING_FLAG)
+      {
+        playSound("start_game");
+        GAME_STARTING_FLAG = false;
       }
     }
   }
@@ -1884,11 +2148,18 @@ void finishGame()
 
   // Calculate Level
   int score = myScore->score;
+
+  myScore->insert(score, player.name);
+  myScore->save();
+
   player.gainXp(score);
+
+  // Insert Score
 
   forceCls();
   printFinishGame(score, player.level);
   printf("\n\n\tContinue Game [press enter]");
+  playSound("lose");
   getchar();
   return;
 }
@@ -1902,18 +2173,57 @@ void printFinishGame(int _score, int _level)
   printf("\tYour current level is : %d", _level);
 }
 
+void playSound(char str[255])
+{
+  if (strcmp(str, "start_game") == 0)
+  {
+    Beep(200, 500);
+    Beep(300, 800);
+  }
+  else if (strcmp(str, "typing") == 0)
+  {
+    Beep(100, 20);
+  }
+  else if (strcmp(str, "last_show") == 0)
+  {
+    int random_freq = randomInt(100, 150);
+    Beep(random_freq, 20);
+  }
+  else if (strcmp(str, "last_typing") == 0)
+  {
+    int random_freq = randomInt(100, 120);
+    Beep(random_freq, 30);
+  }
+  else if (strcmp(str, "loading") == 0)
+  {
+    Beep(300, 20);
+    Beep(500, 50);
+    Beep(350, 30);
+  }
+  else if (strcmp(str, "choose") == 0)
+  {
+    Beep(200, 30);
+  }
+  else if (strcmp(str, "game") == 0)
+  {
+    int randomFreq = randomInt(10, 300);
+    Beep(randomFreq, SLEEP_TIME);
+  }
+  else if (strcmp(str, "lose") == 0)
+  {
+    Beep(200, 500);
+    Beep(300, 800);
+  }
+}
+
 void startGame()
 {
   forceCls();
-
   bomb = new Bomb();
   totalEnemy = 0;
   enemyBullet = 0;
 
-  if (myScore)
-    delete myScore;
-
-  myScore = new Score();
+  myScore->reset();
 
   if (shooter)
     delete shooter;
@@ -1930,37 +2240,47 @@ void startGame()
   ui = new UI(8, 52);
   myScore->renderUi();
   GAME_IS_RUNNING = true;
+  GAME_STARTING_FLAG = true;
 }
 
-void printLobby(int _x, int _y)
+bool isSpaceshipOpen()
 {
-  moveCursor(_x, _y);
-  for (int i = 0; i < SIZE_LOBBY_X; i++)
-  {
-    for (int j = 0; j < SIZE_LOBBY_Y; j++)
-    {
-      if (game.LOBBY_ARENA[i][j] != ' ')
-      {
-        printf("%c", game.LOBBY_ARENA[i][j]);
-      }
-      else
-      {
-        moveCursor(_x + j + 1, _y + i);
-      }
-    }
-    printf("\n");
-  }
-  resetCursor();
+  if (player.level > NEED_LEVEL_TO_OPEN_SPACESHIP)
+    return true;
+  else
+    return false;
 }
 
 void renderLobby()
 {
-  printLobby(0, 0);
+  game.checkShopOpen();
+  for (int i = 0; i < SIZE_LOBBY_X; i++)
+  {
+    for (int j = 0; j < SIZE_LOBBY_Y; j++)
+    {
+      if (player.x == i && player.y == j)
+      {
+        // Print Player
+        printf("%c", player.symbol);
+      }
+      else
+      {
+        printf("%c", game.LOBBY_ARENA[i][j]);
+      }
+    }
 
-  player.printStatus(LOBBY_STATUS_COORDINATE_X, 7);
+    if (i == game.statusInit)
+    {
+      PRINT_EMPTY();
+      printf("%s", game.statusText);
+      strcpy(game.statusText, EMPTY_50);
+    }
+
+    printf("\n");
+  }
 
   // Print Status
-  player.printGameStatus(LOBBY_STATUS_COORDINATE_X, 3);
+  player.printStatus(LOBBY_STATUS_COORDINATE_X, 3);
 
   // Print Text Game
   game.printText(LOBBY_STATUS_COORDINATE_X, 11);
@@ -2091,6 +2411,7 @@ void render()
   {
     cls();
   }
+
   if (strcmp(game.state, "lobby") == 0)
   {
     renderLobby();
@@ -2119,9 +2440,8 @@ int menuUpgradeShop()
   printf("\t1. HP %d/%d - $%d\n", player.hp, MAX_HP, UPGRADE_HP_PRICE);
   printf("\t2. Energy %d/%d - $%d\n", player.energy, MAX_ENERGY, UPGRADE_ENERY_PRICE);
   printf("\t3. Armor %d/%d - $%d\n", player.armor, MAX_ARMOR, UPGRADE_ARMOR_PRICE);
-  printf("\t4. Damage %d/%d - $%d\n", player.damage, MAX_DAMAGE, UPGRADE_DAMAGE_PRICE);
-  printf("\t5. Back");
-  return 5;
+  printf("\t4. Back");
+  return 4;
 }
 
 bool chooseMenuUpgrade(int _idx, int _max)
@@ -2155,16 +2475,19 @@ bool chooseMenuUpgrade(int _idx, int _max)
     return false;
     // Armor
     break;
+
+  // ? don't want to add damage attribute to the game
+
+  // case 3:
+  //   if (
+  //       chooseUpgradeMenu(UPGRADE_DAMAGE_PRICE, MAX_DAMAGE, player.damage))
+  //   {
+  //     player.damage += 1;
+  //   }
+  //   return false;
+  //   // Damage
+  //   break;
   case 3:
-    if (
-        chooseUpgradeMenu(UPGRADE_DAMAGE_PRICE, MAX_DAMAGE, player.damage))
-    {
-      player.damage += 1;
-    }
-    return false;
-    // Damage
-    break;
-  case 4:
     printf("\n\n\tGood bye! Dont forget to came again [press enter]");
     return true;
     // Back
@@ -2186,6 +2509,7 @@ void renderUpgradeShop()
   while (true)
   {
     char buffer = getch();
+    playSound("choose");
     removeCoordinate(rightCoordinate, topOffset + 1 + lastIdx);
     if (buffer == 'w')
     {
@@ -2237,6 +2561,7 @@ void renderItemShop()
   while (true)
   {
     char buffer = getch();
+    playSound("choose");
     removeCoordinate(rightCoordinate, topOffset + 1 + lastIdx);
     if (buffer == 'w')
     {
@@ -2338,6 +2663,7 @@ void renderWeaponShop()
     forceCls();
     menuWeaponShop(idx);
     char buffer = getch();
+    playSound("choose");
 
     if (buffer == 'a')
       idx -= 1;
@@ -2352,7 +2678,7 @@ void renderWeaponShop()
       idx = 0;
   }
   player.ship = idx + 1;
-  printf("\t\nSpaceship Choosed [press enter]");
+  printf("\n\tSpaceship Choosed [press enter]");
 
   game.changeState("lobby");
   game.nextForceCLS();
@@ -2409,7 +2735,7 @@ void printSpace(int _idx)
 
 void menuWeaponShop(int _idx)
 {
-  printf("\n\n\tWelcome to the shop! \n\tSelect your battleship!\n\n");
+  printf("\n\n\t Welcome to the shop! \n\tSelect your battleship!\n\n");
   printSpace(_idx);
   printf("\t[press enter to choose] \n");
   printf("\t< ------------------- > \n");
@@ -2563,17 +2889,17 @@ bool chooseUpgradeMenu(int _price, int _max, int _base)
 {
   if (_base >= _max)
   {
-    printf("You already at the max levels [press enter]\n");
+    printf("\n\n\tYou already at the max levels [press enter]\n");
     getchar();
   }
-  if (_price > player.money)
+  else if (_price > player.money)
   {
-    printf("You don't have enough money! [press enter]\n");
+    printf("\n\n\tYou don't have enough money! [press enter]\n");
     getchar();
   }
   else
   {
-    printf("Succesfully upgraded skills [press enter]\n");
+    printf("\n\n\tSuccesfully upgraded skills [press enter]\n");
     getchar();
     player.money -= _price;
     return true;
@@ -2608,7 +2934,8 @@ void endScreen()
   {
     if (c == '\n')
     {
-      Sleep(20);
+      playSound("last_show");
+      // Sleep(20);
     }
     printf("%c", c);
     c = fgetc(fptr);
@@ -2618,7 +2945,7 @@ void endScreen()
   int length = strlen(text);
   for (int i = 0; i < length; i++)
   {
-    Sleep(30);
+    playSound("last_typing");
     printf("%c", text[i]);
   }
   getch();
