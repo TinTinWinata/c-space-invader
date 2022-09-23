@@ -1,2 +1,2 @@
 
-        printf("DATA : %s", data);
+const int MAX_ENEMY = 255;

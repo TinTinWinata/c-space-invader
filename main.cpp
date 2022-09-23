@@ -37,7 +37,14 @@ const int MAX_ENERGY = 500;
 const int MAX_ARMOR = 30;
 const int MAX_DAMAGE = 10;
 
+// Item Variable
+const int POTION_HP_INCREMENT = 50;
+const int ENERGY_DRINK_INCREMENT = 50;
+
 // Function Prototype List
+void printLobby(int _x, int _y);
+void chooseMenu(int _x, int _y);
+void endScreen();
 void makeCharCoordinate(int _x, int _y, char _symbol);
 void printFinishGame(int _score, int _level);
 void arraySetSpace(char _arr[255][255], int _w, int _h);
@@ -62,6 +69,7 @@ void renderEnemy();
 void spawnEnemyLogic();
 bool isIntersect(int x, int y, int x2, int y2, int w2, int h2);
 bool isBlockIntersect(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2);
+void exitGame();
 void renderLobby();
 void startGame();
 void debug(char *str);
@@ -78,6 +86,7 @@ void renderUpgradeShop();
 bool chooseMenuUpgrade(int _idx, int _max);
 bool chooseUpgradeMenu(int _price, int _max, int _base);
 void checkMovementEnemy();
+void useItem(char str[255]);
 
 // Class Prototype List
 class Enemy;
@@ -112,6 +121,7 @@ Score *myScore = NULL;
 Shooter *shooter = NULL;
 EnemyBullet **enemyBullets = new EnemyBullet *[MAX_BULLET];
 Bomb *bomb = NULL;
+Data *data = NULL;
 
 class UI
 {
@@ -148,7 +158,13 @@ public:
 
   void cleanText(int idx)
   {
+    // Variable Clean
     strcpy(text[idx], EMPTY_50);
+
+    // Real Clean
+    moveCursor(y, x + idx);
+    printf("%s", EMPTY_50);
+    resetCursor();
   }
 
   void render(int idx)
@@ -425,6 +441,7 @@ public:
     }
   }
 
+  // Enemy Logic
   void logic()
   {
     if (lastNode)
@@ -438,6 +455,10 @@ public:
     if (interval >= maxInterval)
     {
       x += 1;
+      if (x >= SIZE_GAME_X - 2)
+      {
+        finishGame();
+      }
       interval = 0;
     }
 
@@ -450,6 +471,7 @@ public:
     }
   }
 
+  // Enemy Render
   void render()
   {
     logic();
@@ -612,6 +634,10 @@ public:
 
   void changeState(char _state[255])
   {
+    if (strcmp(_state, "lobby") == 0)
+    {
+      printLobby(0, 0);
+    }
     strcpy(state, _state);
   }
 
@@ -782,7 +808,7 @@ public:
   int reloadTime = 1000; // milliseconds
   int reloadInterval = 0;
   int reloadMaxInterval = reloadTime / SLEEP_TIME;
-  bool reloading = false;
+  bool reloading = true;
   int skillCost = 30;
   int hp = 100;
   int maxHp = 100;
@@ -843,6 +869,30 @@ public:
     }
 
     calculateInitPos();
+  }
+
+  void addHp(int _hp)
+  {
+    hp += _hp;
+    if (hp > maxHp)
+    {
+      hp = maxHp;
+    }
+  }
+  void addEnergy(int _energy)
+  {
+    energy += _energy;
+    if (energy > maxEnergy)
+    {
+      energy = maxEnergy;
+    }
+  }
+
+  void dontHave(char str[255])
+  {
+    char text[255];
+    sprintf(text, "You don't have any %s left!", str);
+    strcpy(statusText, text);
   }
 
   void calculateInitPos()
@@ -927,18 +977,13 @@ public:
 
     // Health
     ui->cleanText(6);
-    char hpText[255] = "| ";
-    int mod = hp / 10;
-    for (int i = 0; i < hp; i += mod)
-    {
-      strcat(hpText, "-");
-    }
-    char hpTextTemp[255] = "";
-    sprintf(hpTextTemp, " | [%d/%d]", hp, maxHp);
-    strcat(hpText, hpTextTemp);
+    char hpText[255];
+
+    sprintf(hpText, "HP [%d/%d]", hp, maxHp);
     ui->addText(6, hpText);
 
     // Status Text
+    ui->cleanText(8);
     ui->addText(8, statusText);
 
     // Render All
@@ -980,6 +1025,7 @@ public:
     }
   }
 
+  // Shooter Render
   void render()
   {
     removeLastNode();
@@ -1084,9 +1130,20 @@ public:
         skill();
       }
       break;
+    case '1':
+      useItem("potion");
+      break;
+    case '2':
+      useItem("max_potion");
+      break;
+    case '3':
+      useItem("energy");
+      break;
+    case '4':
+      useItem("max_energy");
+      break;
     case 'g':
-      if (bomb)
-        bomb->bomb(x, y);
+      useItem("bomb");
       break;
     }
   }
@@ -1178,7 +1235,7 @@ public:
   int xp = 0;
   int level = 1;
   int money = 0;
-  char name[255] = "Justine";
+  char name[255];
   NPC *npcAround;
   char symbol = 'P';
   int x = 19;
@@ -1198,6 +1255,29 @@ public:
   int bomb = 0;
   // Ship
   int ship = 1;
+
+  Node *lastNode;
+
+  void reset()
+  {
+    xp = 0;
+    level = 1;
+    money = 0;
+    strcpy(name, "");
+    npcAround = NULL;
+    x = 19;
+    y = 17;
+    hp = 100;
+    energy = 50;
+    armor = 1;
+    damage = 1;
+    potion = 0;
+    maxPotion = 0;
+    energyDrink = 0;
+    maxEnergyDrink = 0;
+    bomb = 0;
+    ship = 1;
+  }
 
   Player(char stringify[255])
   {
@@ -1226,8 +1306,10 @@ public:
       idx += 1;
     }
   }
-  debug()
+  void debug()
   {
+    // Function for debug purposes only
+
     puts("DEBUG PLAYER");
     printf("%s %d %d %d %d %d %d %d %d", name, money, xp, level, hp, energy, armor, damage);
     getchar();
@@ -1247,12 +1329,6 @@ public:
     energy = _energy;
     armor = _armor;
     damage = _damage;
-  }
-
-  void save()
-  {
-    char text[255];
-    sprintf(text, "%s#%d#%d#%d#%d#%d#%d#%d", name, money, xp, level, hp, energy, armor, damage);
   }
 
   int gainXp(int _xp)
@@ -1301,7 +1377,15 @@ public:
     return;
   }
 
-  int printStatus(int _x, int _y)
+  void printStatus(int _x, int _y)
+  {
+    moveCursor(_x, _y);
+    printf("%s", game.statusText);
+    strcpy(game.statusText, EMPTY_50);
+    resetCursor();
+  }
+
+  int printGameStatus(int _x, int _y)
   {
     moveCursor(_x, _y);
     printf("[%s]", name);
@@ -1328,25 +1412,33 @@ public:
     case 'w':
       if (game.isIntersect(x - 1, y))
       {
+        removeCoordinate(y, x);
         x -= 1;
+        makeCharCoordinate(y, x, symbol);
       }
       break;
     case 'd':
       if (game.isIntersect(x, y + 1))
       {
+        removeCoordinate(y, x);
         y += 1;
+        makeCharCoordinate(y, x, symbol);
       }
       break;
     case 's':
       if (game.isIntersect(x + 1, y))
       {
+        removeCoordinate(y, x);
         x += 1;
+        makeCharCoordinate(y, x, symbol);
       }
       break;
     case 'a':
       if (game.isIntersect(x, y - 1))
       {
+        removeCoordinate(y, x);
         y -= 1;
+        makeCharCoordinate(y, x, symbol);
       }
       break;
     case ' ':
@@ -1358,6 +1450,7 @@ public:
       }
       if (isInExitPortal())
       {
+        exitGame();
       }
       break;
     case 'y':
@@ -1418,6 +1511,8 @@ public:
     }
   }
 
+  //  Player Render
+
   // Player Logic
   void logic()
   {
@@ -1452,6 +1547,9 @@ public:
 
     if (fp == NULL)
     {
+      printf("Missing player.dat files ! [press enter]");
+      getchar();
+      exit(1);
       return;
     }
 
@@ -1463,15 +1561,94 @@ public:
     fclose(fp);
   }
 
+  void print(int _x, int _y)
+  {
+    for (int i = 0; i < totalPlayer; i++)
+    {
+      moveCursor(_x, _y + i);
+      printf("%d. %s [Level : %d]\n", i + 1, players[i]->name, players[i]->level);
+    }
+  }
+
+  void load(int i)
+  {
+    strcpy(player.name, players[i]->name);
+    player.money = players[i]->money;
+    player.xp = players[i]->xp;
+    player.level = players[i]->level;
+    player.hp = players[i]->hp;
+    player.energy = players[i]->energy;
+    player.armor = players[i]->armor;
+    player.damage = players[i]->damage;
+  }
+
   void save()
   {
+    FILE *fp;
+    fp = fopen("player.dat", "w");
+    if (fp == NULL)
+    {
+      printf("Missing player.dat files ! [press enter]");
+      getchar();
+      exit(1);
+      return;
+    }
+    for (int i = 0; i < totalPlayer; i++)
+    {
+      char text[255];
+      sprintf(text, "%s#%d#%d#%d#%d#%d#%d#%d\n", players[i]->name, players[i]->money, players[i]->xp, players[i]->level, players[i]->hp, players[i]->energy, players[i]->armor, players[i]->damage);
+      fprintf(fp, text);
+    }
+    fclose(fp);
+  }
+
+  bool isExistName(char name[255])
+  {
+    for (int i = 0; i < totalPlayer; i++)
+    {
+      if (strcmp(players[i]->name, name) == 0)
+      {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void savePlayer()
+  {
+    bool isFound = false;
+    for (int i = 0; i < totalPlayer; i++)
+    {
+      if (strcmp(players[i]->name, player.name) == 0)
+      {
+        isFound = true;
+
+        // Is Found Copy the attributes
+        strcpy(players[i]->name, player.name);
+        players[i]->money = player.money;
+        players[i]->xp = player.xp;
+        players[i]->level = player.level;
+        players[i]->hp = player.hp;
+        players[i]->energy = player.energy;
+        players[i]->armor = player.armor;
+        players[i]->damage = player.damage;
+      }
+    }
+    if (!isFound)
+    {
+      // Is not found make another players list
+      players[totalPlayer] = new Player(player.name, player.money, player.xp, player.level, player.hp, player.energy, player.armor, player.damage);
+      totalPlayer += 1;
+    }
+
+    // Save the all players to file
+    save();
   }
 };
 
-Data *data = new Data();
-
 void init()
 {
+  data = new Data();
   data->load();
   srand(time(0));
 
@@ -1500,14 +1677,69 @@ void loading(int _n, int _x, int _y)
   }
 }
 
-intptr_t printStartMenu(int _x, int _y)
+int printStartMenu(int _x, int _y)
 {
   forceCls();
   moveCursor(_x, _y);
-  printf("PLAY");
+  printf("NEW GAME");
   moveCursor(_x, _y + 1);
   printf("LOAD GAME");
   return 2;
+}
+
+void insertNewName(int _x, int _y)
+{
+  forceCls();
+  char name[255];
+  bool isExists = false;
+  do
+  {
+    clsCoordinate(_x, _y, 50, 3);
+    moveCursor(_x, _y);
+    printf("Select Your New Name : ");
+    scanf("%[^\n]", name);
+    getchar();
+    isExists = data->isExistName(name);
+    if (isExists)
+    {
+      moveCursor(_x, _y + 2);
+      printf("Sorry but name already exists! [press enter]");
+      getchar();
+    }
+  } while (isExists);
+
+  // Copy to main player
+  strcpy(player.name, name);
+}
+
+bool loadGame(int _x, int _y)
+{
+  forceCls();
+
+  moveCursor(_x, _y);
+  printf("Save Data : ");
+  data->print(_x, _y + 1);
+
+  moveCursor(_x, _y + 1 + data->totalPlayer);
+  printf("%d. Back", data->totalPlayer + 1);
+  int idx = 0;
+  do
+  {
+    clsCoordinate(_x, _y + 3 + data->totalPlayer, 50, 1);
+    moveCursor(_x, _y + 3 + data->totalPlayer);
+    idx = scanIndex("Choose : ");
+  } while (idx < 1 || idx > data->totalPlayer + 1);
+
+  if (idx == data->totalPlayer + 1)
+  {
+    // Back
+    return false;
+  }
+  else
+  {
+    data->load(idx - 1);
+    return true;
+  }
 }
 
 void chooseMenu(int _x, int _y)
@@ -1520,7 +1752,8 @@ void chooseMenu(int _x, int _y)
   for (;;)
   {
     makeCoordinate(_x + offsetX, _y + idx, "<");
-    removeCoordinate(_x + offsetX, _y + lastIdx);
+    if (lastIdx != idx)
+      removeCoordinate(_x + offsetX, _y + lastIdx);
     char buffer = getch();
     lastIdx = idx;
     if (buffer == 's')
@@ -1542,13 +1775,22 @@ void chooseMenu(int _x, int _y)
   }
   if (idx == 0)
   {
-    theGame();
     // Play Game With Default Character
+    player.reset();
+    insertNewName(_x, _y);
+    theGame();
   }
   else if (idx == 1)
   {
-
     // Load Game
+    if (loadGame(_x, _y))
+    {
+      theGame();
+    }
+    else
+    {
+      chooseMenu(_x, _y);
+    }
   }
 }
 
@@ -1581,6 +1823,7 @@ int main()
 
 void theGame()
 {
+  forceCls();
   render();
   while (true)
   {
@@ -1600,12 +1843,6 @@ void theGame()
     }
     else if (strcmp(game.state, "game") == 0)
     {
-      if (kbhit())
-      {
-        char buffer = getch();
-        shooter->move(buffer);
-        shooter->render();
-      }
 
       if (GAME_IS_RUNNING)
       {
@@ -1616,6 +1853,13 @@ void theGame()
         shooter->renderBullets();
         checkMovementEnemy();
         Sleep(SLEEP_TIME);
+      }
+
+      if (kbhit())
+      {
+        char buffer = getch();
+        shooter->move(buffer);
+        shooter->render();
       }
     }
   }
@@ -1629,7 +1873,6 @@ void debug(char *str)
 
 void finishGame()
 {
-
   GAME_IS_RUNNING = false;
   game.changeState("lobby");
   game.nextForceCLS();
@@ -1645,7 +1888,7 @@ void finishGame()
 
   forceCls();
   printFinishGame(score, player.level);
-  printf("\n\n\tContinue Game [press enter]\n");
+  printf("\n\n\tContinue Game [press enter]");
   getchar();
   return;
 }
@@ -1665,6 +1908,7 @@ void startGame()
 
   bomb = new Bomb();
   totalEnemy = 0;
+  enemyBullet = 0;
 
   if (myScore)
     delete myScore;
@@ -1688,35 +1932,35 @@ void startGame()
   GAME_IS_RUNNING = true;
 }
 
-void renderLobby()
+void printLobby(int _x, int _y)
 {
+  moveCursor(_x, _y);
   for (int i = 0; i < SIZE_LOBBY_X; i++)
   {
     for (int j = 0; j < SIZE_LOBBY_Y; j++)
     {
-      if (player.x == i && player.y == j)
-      {
-        // Print Player
-        printf("%c", player.symbol);
-      }
-      else
+      if (game.LOBBY_ARENA[i][j] != ' ')
       {
         printf("%c", game.LOBBY_ARENA[i][j]);
       }
+      else
+      {
+        moveCursor(_x + j + 1, _y + i);
+      }
     }
-
-    if (i == game.statusInit)
-    {
-      PRINT_EMPTY();
-      printf("%s", game.statusText);
-      strcpy(game.statusText, EMPTY_50);
-    }
-
     printf("\n");
   }
+  resetCursor();
+}
+
+void renderLobby()
+{
+  printLobby(0, 0);
+
+  player.printStatus(LOBBY_STATUS_COORDINATE_X, 7);
 
   // Print Status
-  player.printStatus(LOBBY_STATUS_COORDINATE_X, 3);
+  player.printGameStatus(LOBBY_STATUS_COORDINATE_X, 3);
 
   // Print Text Game
   game.printText(LOBBY_STATUS_COORDINATE_X, 11);
@@ -1753,16 +1997,16 @@ void spawnEnemyLogic()
   enemySpawnInterval += 1;
   if (enemySpawnInterval >= maxEnemySpawnInterval)
   {
-    // Spawn Enemy already 3 seconds
+    // Spawn Enemy if already 3 seconds passed
     enemySpawnInterval = 0;
 
     int x = 0;
-    int y = randomInt(3, SIZE_GAME_Y - (ENEMY_WIDTH * ENEMY_SPAWN_PER_WAVE) - 2);
+    int y = randomInt(3, SIZE_GAME_Y - ((ENEMY_WIDTH + 1) * ENEMY_SPAWN_PER_WAVE) - 2);
 
     for (int i = 0; i < ENEMY_SPAWN_PER_WAVE; i++)
     {
       int randomLvl = randomInt(1, 3);
-      enemies[totalEnemy] = new Enemy(x, y + (i * ENEMY_SPAWN_PER_WAVE), randomLvl, totalEnemy);
+      enemies[totalEnemy] = new Enemy(x, y + (i * (ENEMY_WIDTH + 1)), randomLvl, totalEnemy);
       totalEnemy += 1;
     }
   }
@@ -1847,7 +2091,6 @@ void render()
   {
     cls();
   }
-
   if (strcmp(game.state, "lobby") == 0)
   {
     renderLobby();
@@ -1872,12 +2115,12 @@ void render()
 
 int menuUpgradeShop()
 {
-  printf("Do you need anything to upgrade ?\n");
-  printf("1. HP %d/%d - $%d\n", player.hp, MAX_HP, UPGRADE_HP_PRICE);
-  printf("2. Energy %d/%d - $%d\n", player.energy, MAX_ENERGY, UPGRADE_ENERY_PRICE);
-  printf("3. Armor %d/%d - $%d\n", player.armor, MAX_ARMOR, UPGRADE_ARMOR_PRICE);
-  printf("4. Damage %d/%d - $%d\n", player.damage, MAX_DAMAGE, UPGRADE_DAMAGE_PRICE);
-  printf("5. Back");
+  printf("\n\n\tDo you need anything to upgrade ?\n");
+  printf("\t1. HP %d/%d - $%d\n", player.hp, MAX_HP, UPGRADE_HP_PRICE);
+  printf("\t2. Energy %d/%d - $%d\n", player.energy, MAX_ENERGY, UPGRADE_ENERY_PRICE);
+  printf("\t3. Armor %d/%d - $%d\n", player.armor, MAX_ARMOR, UPGRADE_ARMOR_PRICE);
+  printf("\t4. Damage %d/%d - $%d\n", player.damage, MAX_DAMAGE, UPGRADE_DAMAGE_PRICE);
+  printf("\t5. Back");
   return 5;
 }
 
@@ -1922,7 +2165,7 @@ bool chooseMenuUpgrade(int _idx, int _max)
     // Damage
     break;
   case 4:
-    printf("Good bye! Dont forget to came again [press enter]");
+    printf("\n\n\tGood bye! Dont forget to came again [press enter]");
     return true;
     // Back
   }
@@ -1934,15 +2177,16 @@ void renderUpgradeShop()
   int idx = 0;
   int max = menuUpgradeShop();
   int lastIdx = idx;
-  int rightCoordinate = 30;
+  int rightCoordinate = 45;
+  int topOffset = 2;
 
   // Initiate '<' at first loop
-  makeCoordinate(rightCoordinate, 1 + idx, "<");
+  makeCoordinate(rightCoordinate, topOffset + 1 + idx, "<");
 
   while (true)
   {
     char buffer = getch();
-    removeCoordinate(rightCoordinate, 1 + lastIdx);
+    removeCoordinate(rightCoordinate, topOffset + 1 + lastIdx);
     if (buffer == 'w')
     {
       if (idx > 0)
@@ -1971,7 +2215,7 @@ void renderUpgradeShop()
       }
     }
     lastIdx = idx;
-    makeCoordinate(rightCoordinate, 1 + idx, "<");
+    makeCoordinate(rightCoordinate, topOffset + 1 + idx, "<");
   }
   game.changeState("lobby");
   game.nextForceCLS();
@@ -1984,15 +2228,16 @@ void renderItemShop()
   int idx = 0;
   int max = menuItemShop();
   int lastIdx = idx;
-  int rightCoordinate = 30;
+  int rightCoordinate = 45;
+  int topOffset = 2;
 
   // Initiate '<' at first loop
-  makeCoordinate(rightCoordinate, 1 + idx, "<");
+  makeCoordinate(rightCoordinate, topOffset + 1 + idx, "<");
 
   while (true)
   {
     char buffer = getch();
-    removeCoordinate(rightCoordinate, 1 + lastIdx);
+    removeCoordinate(rightCoordinate, topOffset + 1 + lastIdx);
     if (buffer == 'w')
     {
       if (idx > 0)
@@ -2013,7 +2258,7 @@ void renderItemShop()
       break;
     }
     lastIdx = idx;
-    makeCoordinate(rightCoordinate, 1 + idx, "<");
+    makeCoordinate(rightCoordinate, topOffset + 1 + idx, "<");
   }
   game.changeState("lobby");
   game.nextForceCLS();
@@ -2031,14 +2276,14 @@ void chooseMenuItem(int _idx, int _max)
     howMany = choosedBuyMenu(POTION_PRICE, "Potion");
     if (howMany != -1)
     {
-      player.potion += 1;
+      player.potion += howMany;
     }
     break;
   case 1:
     howMany = choosedBuyMenu(MAX_POTION_PRICE, "Max Potion");
     if (howMany != -1)
     {
-      player.maxPotion += 1;
+      player.maxPotion += howMany;
     }
     // Max Potion
     break;
@@ -2046,7 +2291,7 @@ void chooseMenuItem(int _idx, int _max)
     howMany = choosedBuyMenu(ENERGY_DRINK_PRICE, "Energy Drink");
     if (howMany != -1)
     {
-      player.potion += 1;
+      player.energyDrink += howMany;
     }
     // Energy Drink
     break;
@@ -2054,7 +2299,7 @@ void chooseMenuItem(int _idx, int _max)
     howMany = choosedBuyMenu(MAX_ENERGY_DRINK_PRICE, "Max Energy Drink");
     if (howMany != -1)
     {
-      player.potion += 1;
+      player.maxEnergyDrink += howMany;
     }
     // Max Energy Drink
     break;
@@ -2062,12 +2307,12 @@ void chooseMenuItem(int _idx, int _max)
     howMany = choosedBuyMenu(BOMB_PRICE, "Bomb");
     if (howMany != -1)
     {
-      player.potion += 1;
+      player.bomb += howMany;
     }
     // Bomb
     break;
   case 5:
-    printf("\nSee you again! [press enter]");
+    printf("\n\n\tSee you again! [press enter]");
     break;
   }
   return;
@@ -2075,13 +2320,13 @@ void chooseMenuItem(int _idx, int _max)
 
 int menuItemShop()
 {
-  printf("Welcome to the item shop\n");
-  printf("1. Potion [$%d]\n", POTION_PRICE);
-  printf("2. Max Potion [$%d]\n", MAX_POTION_PRICE);
-  printf("3. Energy Drink [$%d]\n", ENERGY_DRINK_PRICE);
-  printf("4. Max Energy Drink [$%d]\n", MAX_ENERGY_DRINK_PRICE);
-  printf("5. Bomb [$%d]\n", BOMB_PRICE);
-  printf("6. Back");
+  printf("\n\n\tWelcome to the item shop\n");
+  printf("\t1. Potion [$%d]\n", POTION_PRICE);
+  printf("\t2. Max Potion [$%d]\n", MAX_POTION_PRICE);
+  printf("\t3. Energy Drink [$%d]\n", ENERGY_DRINK_PRICE);
+  printf("\t4. Max Energy Drink [$%d]\n", MAX_ENERGY_DRINK_PRICE);
+  printf("\t5. Bomb [$%d]\n", BOMB_PRICE);
+  printf("\t6. Back");
   return 6;
 }
 
@@ -2107,7 +2352,7 @@ void renderWeaponShop()
       idx = 0;
   }
   player.ship = idx + 1;
-  printf("\nSpaceship Choosed [press enter]");
+  printf("\t\nSpaceship Choosed [press enter]");
 
   game.changeState("lobby");
   game.nextForceCLS();
@@ -2126,33 +2371,33 @@ void printSpace(int _idx)
     h = SPACE_1_H;
     arraySetSpace(item, w, h);
     loadSprite("space_1.txt", item);
-    printf("   %s\n\n", SPACESHIP_NAME[_idx]);
+    printf("\t   %s\n\n", SPACESHIP_NAME[_idx]);
     break;
   case 1:
     w = SPACE_2_W;
     h = SPACE_2_H;
     arraySetSpace(item, w, h);
-    printf("    %s\n\n", SPACESHIP_NAME[_idx]);
+    printf("\t    %s\n\n", SPACESHIP_NAME[_idx]);
     loadSprite("space_2.txt", item);
     break;
   case 2:
     w = SPACE_3_W;
     h = SPACE_3_H;
     arraySetSpace(item, w, h);
-    printf("  %s\n\n", SPACESHIP_NAME[_idx]);
+    printf("\t  %s\n\n", SPACESHIP_NAME[_idx]);
     loadSprite("space_3.txt", item);
     break;
   case 3:
     w = SPACE_4_W;
     h = SPACE_4_H;
     arraySetSpace(item, w, h);
-    printf("    %s\n\n", SPACESHIP_NAME[_idx]);
+    printf("\t    %s\n\n", SPACESHIP_NAME[_idx]);
     loadSprite("space_4.txt", item);
     break;
   }
   for (int i = 0; i < h; i++)
   {
-    printf("\t");
+    printf("\t\t");
     for (int j = 0; j < w; j++)
     {
       printf("%c", item[i][j]);
@@ -2164,10 +2409,10 @@ void printSpace(int _idx)
 
 void menuWeaponShop(int _idx)
 {
-  printf(" Welcome to the shop! \nSelect your battleship!\n\n");
+  printf("\n\n\tWelcome to the shop! \n\tSelect your battleship!\n\n");
   printSpace(_idx);
-  printf("[press enter to choose] \n");
-  printf("< ------------------- > \n");
+  printf("\t[press enter to choose] \n");
+  printf("\t< ------------------- > \n");
   return;
 }
 
@@ -2192,7 +2437,7 @@ void clsCoordinate(int _x, int _y, int _w, int _h)
     moveCursor(_x, _y + i);
     for (int j = 0; j < _w; j++)
     {
-      printf("%c");
+      printf(" ");
     }
   }
   resetCursor();
@@ -2274,13 +2519,13 @@ void loadSprite(char *_filename, char sprite[255][255])
 
 void successBuyStatus(int _howMany, char _name[255])
 {
-  printf("Succesfully Purchased %d %s! [press enter]", _howMany, _name);
+  printf("\n\n\tSuccesfully Purchased %d %s! [press enter]", _howMany, _name);
   return;
 }
 
 void dontHaveMoneyStatus()
 {
-  printf("You dont have enough money! [press enter]");
+  printf("\n\n\tYou dont have enough money! [press enter]");
   return;
 }
 
@@ -2296,7 +2541,7 @@ int scanIndex(char str[255])
 int choosedBuyMenu(int _price, char _name[255])
 {
   char text[255];
-  snprintf(text, sizeof(text), "How many %s do you want to buy ?\n- ", _name);
+  snprintf(text, sizeof(text), "\n\n\tHow many %s do you want to buy ?\n\t- ", _name);
   int howMany = scanIndex(text);
   int totalPrice = howMany * _price;
   if (totalPrice > player.money)
@@ -2343,6 +2588,121 @@ void arraySetSpace(char _arr[255][255], int _w, int _h)
     for (int j = 0; j < _w; j++)
     {
       _arr[i][j] = ' ';
+    }
+  }
+}
+
+void endScreen()
+{
+  forceCls();
+  FILE *fptr;
+  char c;
+  fptr = fopen("logo.txt", "r");
+  if (fptr == NULL)
+  {
+    printf("Cannot open file \n");
+    exit(0);
+  }
+  c = fgetc(fptr);
+  while (c != EOF)
+  {
+    if (c == '\n')
+    {
+      Sleep(20);
+    }
+    printf("%c", c);
+    c = fgetc(fptr);
+  }
+  fclose(fptr);
+  char text[] = {"\n\n\tAlongside courage and perseverance, we shape and define our future.\n\tJT 22-1"};
+  int length = strlen(text);
+  for (int i = 0; i < length; i++)
+  {
+    Sleep(30);
+    printf("%c", text[i]);
+  }
+  getch();
+  exit(1);
+}
+
+void exitGame()
+{
+  data->savePlayer();
+  endScreen();
+}
+
+void useItem(char str[255])
+{
+  if (strcmp(str, "potion") == 0)
+  {
+    if (player.potion > 0)
+    {
+      shooter->addHp(POTION_HP_INCREMENT);
+      player.potion -= 1;
+      strcpy(shooter->statusText, "Used Potion!");
+      shooter->renderStatus();
+    }
+    else
+    {
+      shooter->dontHave("potion");
+    }
+  }
+  else if (strcmp(str, "max_potion") == 0)
+  {
+    if (player.maxPotion > 0)
+    {
+      shooter->hp = shooter->maxHp;
+      player.maxPotion -= 1;
+      strcpy(shooter->statusText, "Used Max Potion!");
+      shooter->renderStatus();
+    }
+    else
+    {
+      shooter->dontHave("max potion");
+    }
+  }
+  else if (strcmp(str, "energy") == 0)
+  {
+    if (player.energyDrink > 0)
+    {
+
+      shooter->addEnergy(ENERGY_DRINK_INCREMENT);
+      player.energyDrink -= 1;
+      strcpy(shooter->statusText, "Used Energy Drink!");
+      shooter->renderStatus();
+    }
+    else
+    {
+      shooter->dontHave("energy drink");
+    }
+  }
+  else if (strcmp(str, "max_energy") == 0)
+  {
+    if (player.maxEnergyDrink > 0)
+    {
+      shooter->energy = shooter->maxEnergy;
+      player.maxEnergyDrink -= 1;
+      strcpy(shooter->statusText, "Max Energy Drink!");
+      shooter->renderStatus();
+    }
+    else
+    {
+      shooter->dontHave("max energy drink");
+    }
+  }
+  else if (strcmp(str, "bomb") == 0)
+  {
+    if (player.bomb > 0)
+    {
+
+      bomb->bomb(shooter->x, shooter->y);
+      bomb -= 1;
+      strcpy(shooter->statusText, "BOMB!");
+      shooter->renderStatus();
+    }
+    else
+    {
+      shooter->dontHave("bomb");
     }
   }
 }
