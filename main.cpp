@@ -15,7 +15,7 @@ const int LOBBY_STATUS_COORDINATE_X = SIZE_LOBBY_Y + 4;
 const int ENEMY_COOLDOWN = 2000; // milliseconds
 const int ENEMY_MOVEMENT_INTERVAL = 3000;
 const int ENEMY_SPAWN_PER_WAVE = 3;
-const int ENEMY_SHOOT_INTERVAL = 2000;
+const int ENEMY_SHOOT_INTERVAL = 1000;
 const int MAX_XP_TO_LEVEL_UP = 100;
 const int MAX_PLAYER_LVL = 100;
 const int LOADING_TIME = 1000;
@@ -254,6 +254,8 @@ public:
     fclose(fp);
   }
 
+  void sort()
+  {
     for (int i = 0; i < allIdx - 1; i++)
     {
       for (int j = 0; j < allIdx - i - 1; j++)
@@ -459,7 +461,7 @@ public:
   int score = 10;
   int idx = -1;
 
-  int shootInterval = 0;
+  float shootInterval = 0;
   int maxShootInterval = ENEMY_SHOOT_INTERVAL / SLEEP_TIME;
 
   // Movement Speed =  (Sleep Time * Max Interval)
@@ -532,7 +534,7 @@ public:
 
   void removeLastNode()
   {
-    if (x <= 0 || x >= SIZE_GAME_X - 1)
+    if (x < 0 || x >= SIZE_GAME_X - 1)
     {
       return;
     }
@@ -595,7 +597,7 @@ public:
     }
 
     // Shoot Interval
-    shootInterval += 1;
+    shootInterval += randomFloat();
     if (shootInterval >= maxShootInterval)
     {
       shootInterval = 0;
@@ -607,7 +609,7 @@ public:
   void render()
   {
     logic();
-    if (x <= 0 || x >= SIZE_GAME_X - 1)
+    if (x < 0 || x >= SIZE_GAME_X - 1)
     {
       return;
     }
@@ -2077,7 +2079,6 @@ int main()
 {
   init();
   mainMenu(3, 2);
-  // theGame();
 }
 
 void theGame()
