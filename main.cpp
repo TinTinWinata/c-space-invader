@@ -22,6 +22,7 @@ const int MAX_XP_TO_LEVEL_UP = 100;
 const int MAX_PLAYER_LVL = 100;
 const int LOADING_TIME = 1000;
 const int NEED_LEVEL_TO_OPEN_SPACESHIP = 10;
+const int MAX_ARR = 255;
 
 // Price Item Variable
 const int POTION_PRICE = 5;
@@ -437,10 +438,13 @@ public:
 
   void logic()
   {
+    // debug("rendering");
     if (lastNode)
     {
+      // debug("deleting");
       removeCoordinate(y, x);
       delete lastNode;
+      // debug("deleted");
     }
     lastNode = new Node(x, y);
     x += vx;
@@ -995,7 +999,7 @@ public:
   int reloadTime = 1000; // milliseconds
   int reloadInterval = 0;
   int reloadMaxInterval = reloadTime / SLEEP_TIME;
-  bool reloading = true;
+  bool reloading = false;
   int skillCost = 30;
   int hp = 100;
   int maxHp = 100;
@@ -1003,7 +1007,7 @@ public:
   int w = 7;
   int x = 15;
   int y = 21;
-  char shooter[255][255];
+  char shooter[MAX_ARR][MAX_ARR];
   char bulletSymbol = '^';
   char skillSymbol = 'o';
   int bullet = 0;
@@ -1014,6 +1018,17 @@ public:
   int energy = 0;
   int armor = 0;
   int clip = 0;
+
+  void clearShooterSprite()
+  {
+    for (int i = 0; i < MAX_ARR; i++)
+    {
+      for (int j = 0; j < MAX_ARR; j++)
+      {
+        shooter[i][j] = ' ';
+      }
+    }
+  }
 
   Shooter(int level, int _damage, int _hp, int _energy, int _armor, int _maxBullet)
   {
@@ -1034,7 +1049,7 @@ public:
     char fileName[255];
     sprintf(fileName, "space_%d.txt", level);
     loadPlayer(fileName);
-    type = 1;
+    type = level;
     switch (level)
     {
     case 1:
@@ -1345,6 +1360,7 @@ public:
 
   void loadPlayer(char *_filename)
   {
+    clearShooterSprite();
     FILE *ptr;
     char ch;
     ptr = fopen(_filename, "r");
@@ -2218,7 +2234,7 @@ void finishGame()
   forceCls();
   printFinishGame(score, player.level);
   printf("\n\n\tContinue Game [press enter]");
-  playSound("lose");
+  // playSound("lose");
   getchar();
   return;
 }
