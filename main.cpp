@@ -7,6 +7,8 @@
 #include <time.h>
 
 // Variable
+const int MAIN_MENU_X = 3;
+const int MAIN_MENU_Y = 2;
 const int TOTAL_TEXT = 3;
 const int MAX_UI_TEXT = 10;
 const int MAX_ENEMY = 255;
@@ -43,6 +45,7 @@ const int POTION_HP_INCREMENT = 50;
 const int ENERGY_DRINK_INCREMENT = 50;
 
 // Function Prototype List
+void resetColor();
 void printSetting(int _x, int _y);
 void printHowToPlay(int _x, int _y);
 void playSound(char str[255]);
@@ -135,6 +138,9 @@ public:
   int totalText = 0;
   char text[MAX_UI_TEXT][255];
   int y;
+  char valueColor[255][255];
+  int indexColor[255];
+  int totalColor = 0;
 
   UI(int _x, int _y)
   {
@@ -161,10 +167,18 @@ public:
     }
   }
 
+  void color(int i, char str[255])
+  {
+    indexColor[totalColor] = i;
+    strcpy(valueColor[totalColor], str);
+    totalColor += 1;
+  }
+
   void cleanText(int idx)
   {
     // Variable Clean
     strcpy(text[idx], EMPTY_50);
+    // totalColor = 0;
 
     // Real Clean
     moveCursor(y, x + idx);
@@ -184,7 +198,25 @@ public:
     for (int i = 0; i < MAX_UI_TEXT; i++)
     {
       moveCursor(y, x + i);
+      // Checking Color
+
+      // First Always Get Colored Red
+      if (i == 0)
+      {
+        printf(COLOR_RESET);
+        printf("\u001b[41m");
+      }
+
+      for (int j = 0; j < totalColor; j++)
+      {
+        if (i == indexColor[j])
+        {
+          printf(valueColor[j]);
+        }
+      }
       printf("%s", text[i]);
+
+      resetColor();
       resetCursor();
     }
   }
@@ -192,10 +224,9 @@ public:
 
 class Score
 {
-
 public:
   int score = 0;
-  int uiIdx = 2;
+  int uiIdx = 3;
   char allName[255][255];
   char allScore[255];
   int allIdx = 0;
@@ -350,6 +381,7 @@ public:
     char scoreText[255];
     sprintf(scoreText, "Score : %.2d", score);
     ui->cleanText(uiIdx);
+    ui->color(uiIdx, COLOR_YELLOW);
     ui->addText(uiIdx, scoreText);
     ui->renderAll();
   }
@@ -755,6 +787,8 @@ public:
     }
     else
     {
+      LOBBY_ARENA[7][5] = ' ';
+      LOBBY_ARENA[7][10] = ' ';
       LOBBY_ARENA[6][6] = '-';
       LOBBY_ARENA[6][7] = '-';
       LOBBY_ARENA[6][8] = '-';
@@ -1000,7 +1034,7 @@ public:
     char fileName[255];
     sprintf(fileName, "space_%d.txt", level);
     loadPlayer(fileName);
-    type = level - 1;
+    type = 1;
     switch (level)
     {
     case 1:
@@ -1117,23 +1151,24 @@ public:
 
     // Title
     ui->cleanText(0);
+    // ui->color(0, COLOR_MAGENTA);
     ui->addText(0, "C Space Invader");
-
-    // Bullet
-    ui->cleanText(1);
-    char bulletText[255];
-    sprintf(bulletText, "Bullets %.2d/%.2d", clip - bullet, clip);
-    ui->addText(1, bulletText);
 
     // Status Name
     char shipText[255];
     sprintf(shipText, "%s", SPACESHIP_NAME[type - 1]);
-    ui->addText(3, shipText);
+    ui->addText(1, shipText);
+
+    // Bullet
+    ui->cleanText(4);
+    char bulletText[255];
+    sprintf(bulletText, "Bullets %.2d/%.2d", clip - bullet, clip);
+    ui->addText(4, bulletText);
 
     // energy
     char energyText[255];
     sprintf(energyText, "Energy %.2d/%.2d", energy, maxEnergy);
-    ui->addText(4, energyText);
+    ui->addText(7, energyText);
 
     // Health
     ui->cleanText(6);
@@ -1143,8 +1178,8 @@ public:
     ui->addText(6, hpText);
 
     // Status Text
-    ui->cleanText(8);
-    ui->addText(8, statusText);
+    ui->cleanText(9);
+    ui->addText(9, statusText);
 
     // Render All
     ui->renderAll();
@@ -1370,7 +1405,7 @@ public:
     ready = true;
     if (checkType("npc_weapon"))
     {
-      game.addText("Welcome to Weapon Dealer");
+      game.addText("Welcome to Spaceship Station");
       game.addText("Do you want to buy any weapon ? [y\\n]");
     }
     else if (checkType("npc_item"))
@@ -1519,6 +1554,7 @@ public:
     myScore->print();
     printf("\n\tBack to menu ? [press enter]");
     getchar();
+    forceCls();
     return;
   }
 
@@ -1547,19 +1583,13 @@ public:
   int printStatus(int _x, int _y)
   {
     moveCursor(_x, _y);
+    printf("%s", COLOR_YELLOW);
     printf("[%s]", name);
+    printf("%s", COLOR_RESET);
     moveCursor(_x, _y + 1);
     printf("Level : %d", level);
     moveCursor(_x, _y + 2);
     printf("Money : %d", money);
-    // moveCursor(_x, _y + 3);
-    // printf("Max HP : %d", hp);
-    // moveCursor(_x, _y + 4);
-    // printf("Max Energy : %d", energy);
-    // moveCursor(_x, _y + 5);
-    // printf("Max Armor : %d", armor);
-    // moveCursor(_x, _y + 6);
-    // printf("Damage : %d", damage);
     resetCursor();
     return 3;
   }
@@ -1668,6 +1698,22 @@ public:
     }
   }
 
+  bool isFrontClosedDoor()
+  {
+    if (!isSpaceshipOpen())
+    {
+      // If not open validate closed door
+      for (int i = 0; i < 4; i++)
+      {
+        if (x == 7 && y == 6 + i)
+        {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   bool isInPortal()
   {
     if (x == 10 && y == 17)
@@ -1698,6 +1744,12 @@ public:
     if (isOnLeaderboard())
     {
       strcpy(game.statusText, "Press SPACE to see Leaderboard");
+    }
+    if (isFrontClosedDoor())
+    {
+      char text[255];
+      sprintf(text, "You need level %d to unlock spaceship station", NEED_LEVEL_TO_OPEN_SPACESHIP);
+      strcpy(game.statusText, "You need level 10 to unlock spaceship");
     }
   }
 };
@@ -1834,8 +1886,6 @@ void init()
   npcs[2] = new NPC(16, 6, 'U', "npc_upgrade");
 
   totalNpc = 3;
-
-  forceCls();
 }
 
 void loading(int _n, int _x, int _y)
@@ -1855,6 +1905,7 @@ void loading(int _n, int _x, int _y)
 int printStartMenu(int _x, int _y)
 {
   forceCls();
+
   moveCursor(_x, _y);
   printf("NEW GAME");
   moveCursor(_x, _y + 1);
@@ -1863,7 +1914,9 @@ int printStartMenu(int _x, int _y)
   printf("SETTING");
   moveCursor(_x, _y + 3);
   printf("HOW TO PLAY");
-  return 4;
+  moveCursor(_x, _y + 4);
+  printf("EXIT");
+  return 5;
 }
 
 void insertNewName(int _x, int _y)
@@ -2012,12 +2065,16 @@ void chooseMenu(int _x, int _y)
   }
   else if (idx == 3)
   {
-    // Setting
+    // How To Play
     forceCls();
     printHowToPlay(_x, _y);
     printf("\n\tBack to menu ? [press enter]");
     getchar();
     chooseMenu(_x, _y);
+  }
+  else if (idx == 4)
+  {
+    endScreen();
   }
 }
 
@@ -2078,7 +2135,8 @@ void mainMenu(int _x, int _y)
 int main()
 {
   init();
-  mainMenu(3, 2);
+  forceCls();
+  mainMenu(MAIN_MENU_X, MAIN_MENU_Y);
 }
 
 void theGame()
@@ -2238,7 +2296,7 @@ void startGame()
   if (ui)
     delete ui;
 
-  ui = new UI(8, 52);
+  ui = new UI(6, 52);
   myScore->renderUi();
   GAME_IS_RUNNING = true;
   GAME_STARTING_FLAG = true;
@@ -2273,7 +2331,19 @@ void renderLobby()
     if (i == game.statusInit)
     {
       PRINT_EMPTY();
+
+      // Red Background Color
+      // if (strcmp(game.statusText, EMPTY_50) == 0)
+      // {
+      //   resetColor();
+      // }
+      // else
+      // {
+      //   printf("\u001b[41m");
+      // }
+
       printf("%s", game.statusText);
+      // resetColor();
       strcpy(game.statusText, EMPTY_50);
     }
 
@@ -2736,7 +2806,7 @@ void printSpace(int _idx)
 
 void menuWeaponShop(int _idx)
 {
-  printf("\n\n\t Welcome to the shop! \n\tSelect your battleship!\n\n");
+  printf("\n\n\tWelcome to the station! \n\t  Select your spaceship!\n\n");
   printSpace(_idx);
   printf("\t[press enter to choose] \n");
   printf("\t< ------------------- > \n");
@@ -2956,6 +3026,8 @@ void endScreen()
 void exitGame()
 {
   data->savePlayer();
+  forceCls();
+  chooseMenu(MAIN_MENU_X, MAIN_MENU_Y);
   endScreen();
 }
 
@@ -3033,4 +3105,13 @@ void useItem(char str[255])
       shooter->dontHave("bomb");
     }
   }
+}
+
+void resetColor()
+{
+  // Reset Color Background
+  printf("\033[0m");
+
+  // Reset White Color
+  printf(COLOR_RESET);
 }
