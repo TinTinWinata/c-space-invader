@@ -1293,6 +1293,12 @@ public:
   void move(char str)
   {
     saveLastNode();
+
+    if (str >= 65 && str <= 90)
+    {
+      str = str + 32;
+    }
+
     switch (str)
     {
     case 'q':
@@ -1613,6 +1619,11 @@ public:
   // Player Move
   void move(char str)
   {
+    if (str >= 65 && str <= 90)
+    {
+      str = str + 32;
+    }
+
     switch (str)
     {
     case 'w':
@@ -1990,6 +2001,12 @@ bool loadGame(int _x, int _y)
     }
     makeCoordinate(_x + offset, _y + 1 + idx, "<");
     char buffer = getch();
+
+    if (buffer >= 65 && buffer <= 90)
+    {
+      buffer = buffer + 32;
+    }
+
     lastIdx = idx;
     playSound("choose");
     if (buffer == 'w')
@@ -2040,6 +2057,11 @@ void chooseMenu(int _x, int _y)
     if (lastIdx != idx)
       removeCoordinate(_x + offsetX, _y + lastIdx);
     char buffer = getch();
+    if (buffer >= 65 && buffer <= 90)
+    {
+      buffer = buffer + 32;
+    }
+
     playSound("choose");
     lastIdx = idx;
     if (buffer == 's')
@@ -2603,6 +2625,11 @@ void renderUpgradeShop()
   while (true)
   {
     char buffer = getch();
+    if (buffer >= 65 && buffer <= 90)
+    {
+      buffer = buffer + 32;
+    }
+
     playSound("choose");
     removeCoordinate(rightCoordinate, topOffset + 1 + lastIdx);
     if (buffer == 'w')
@@ -2655,6 +2682,11 @@ void renderItemShop()
   while (true)
   {
     char buffer = getch();
+    if (buffer >= 65 && buffer <= 90)
+    {
+      buffer = buffer + 32;
+    }
+
     playSound("choose");
     removeCoordinate(rightCoordinate, topOffset + 1 + lastIdx);
     if (buffer == 'w')
@@ -2757,6 +2789,11 @@ void renderWeaponShop()
     forceCls();
     menuWeaponShop(idx);
     char buffer = getch();
+    if (buffer >= 65 && buffer <= 90)
+    {
+      buffer = buffer + 32;
+    }
+
     playSound("choose");
 
     if (buffer == 'a')
