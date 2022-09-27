@@ -1,0 +1,8 @@
+bryan#1#100#0#55
+weapon#Five Seven_true_20_3
+weapon#S12_true_15_0
+weapon#HAMR_false_40_0
+weapon#RPG_false_1_0
+potion#Small Potion_3
+potion#Medium Potion_4
+potion#Large Potion_3

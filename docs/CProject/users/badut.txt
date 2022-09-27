@@ -1,0 +1,8 @@
+badut#4#130#50#179
+weapon#Five Seven_true_18_6
+weapon#S12_false_15_0
+weapon#HAMR_false_40_0
+weapon#RPG_false_1_0
+potion#Small Potion_0
+potion#Medium Potion_0
+potion#Large Potion_7

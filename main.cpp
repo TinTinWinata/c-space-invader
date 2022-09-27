@@ -1940,6 +1940,7 @@ void insertNewName(int _x, int _y)
   forceCls();
   char name[255];
   bool isExists = false;
+  bool isNotValid = false;
   do
   {
     clsCoordinate(_x, _y, 50, 3);
@@ -1948,13 +1949,20 @@ void insertNewName(int _x, int _y)
     scanf("%[^\n]", name);
     getchar();
     isExists = data->isExistName(name);
+    isNotValid = strlen(name) < 3;
     if (isExists)
     {
       moveCursor(_x, _y + 2);
       printf("Sorry but name already exists! [press enter]");
       getchar();
     }
-  } while (isExists);
+    if (isNotValid)
+    {
+      moveCursor(_x, _y + 2);
+      printf("Please insert more than 3 characters [press enter]");
+      getchar();
+    }
+  } while (isExists || isNotValid);
 
   // Copy to main player
   strcpy(player.name, name);
@@ -2186,7 +2194,6 @@ void theGame()
         shooter->renderBullets();
         checkMovementEnemy();
         Sleep(SLEEP_TIME);
-        // playSound("game");
       }
 
       if (kbhit())

@@ -1,0 +1,8 @@
+felix#61#700#225#16380
+weapon#Five Seven_true_15_33
+weapon#S12_true_4_11
+weapon#HAMR_true_31_23
+weapon#RPG_true_2_5
+potion#Small Potion_0
+potion#Medium Potion_0
+potion#Large Potion_0
