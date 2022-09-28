@@ -837,7 +837,7 @@ public:
     forceClsFlag = true;
   }
 	
-  Game()
+  Game(
   {
     clearText();
   }
