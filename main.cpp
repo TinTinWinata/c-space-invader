@@ -252,7 +252,7 @@ public:
   {
     char line[255];
     FILE *fp;
-    fp = fopen("score.dat", "r");
+    fp = fopen("database/score.dat", "r");
     if (fp == NULL)
     {
       printf("Missing score.dat files ! [press enter]");
@@ -515,7 +515,7 @@ public:
     x = _x;
     y = _y;
     char text[255];
-    sprintf(text, "enemy_%d.txt", _level);
+    sprintf(text, "assets/enemy_%d.txt", _level);
     loadSprite(text, sprite);
 
     if (_level == 1)
@@ -836,7 +836,7 @@ public:
   {
     forceClsFlag = true;
   }
-
+	
   Game()
   {
     clearText();
@@ -866,7 +866,7 @@ public:
   {
     FILE *ptr;
     char ch;
-    ptr = fopen("lobby.txt", "r");
+    ptr = fopen("assets/lobby.txt", "r");
     int jIdx = 0;
     int iIdx = 0;
     do
@@ -894,7 +894,7 @@ public:
   {
     FILE *ptr;
     char ch;
-    ptr = fopen("game.txt", "r");
+    ptr = fopen("assets/game.txt", "r");
     int jIdx = 0;
     int iIdx = 0;
     do
@@ -1047,7 +1047,7 @@ public:
 
     // Load Character
     char fileName[255];
-    sprintf(fileName, "space_%d.txt", level);
+    sprintf(fileName, "assets/space_%d.txt", level);
     loadPlayer(fileName);
     type = level;
     switch (level)
@@ -1789,11 +1789,11 @@ public:
   Player **players = new Player *[255];
   int totalPlayer = 0;
   int totalAttrbNeeded = 8;
-  void load()
+  void load() 
   {
     char line[255];
     FILE *fp;
-    fp = fopen("player.dat", "r");
+    fp = fopen("database/player.dat", "r");
 
     if (fp == NULL)
     {
@@ -3054,7 +3054,7 @@ void endScreen()
   forceCls();
   FILE *fptr;
   char c;
-  fptr = fopen("logo.txt", "r");
+  fptr = fopen("assets/logo.txt", "r");
   if (fptr == NULL)
   {
     printf("Cannot open file \n");
