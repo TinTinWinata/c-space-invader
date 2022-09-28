@@ -46,6 +46,11 @@ const int POTION_HP_INCREMENT = 50;
 const int ENERGY_DRINK_INCREMENT = 50;
 
 // Function Prototype List
+void displayCheatActivated();
+void cheatBomb();
+void cheatItem();
+void cheatAttribute();
+void cheatLevel();
 void resetColor();
 void printSetting(int _x, int _y);
 void printHowToPlay(int _x, int _y);
@@ -109,6 +114,7 @@ class EnemyBullet;
 class PlayerBullet;
 class Bomb;
 class Data;
+class Cheat;
 
 // Variable List
 
@@ -155,6 +161,7 @@ public:
     if (idx >= MAX_UI_TEXT)
     {
       printf("Invalid text!");
+      fflush(stdin);
       getchar();
     }
     strcpy(text[idx], val);
@@ -223,6 +230,74 @@ public:
   }
 };
 
+class Cheat
+{
+public:
+  char buffers[3000];
+  int totalBuffer = 0;
+  char cheatBombBuffer[255] = "wasdwasdwasdwasd";
+  char cheatItemBuffer[255] = "asdasdasdasd";
+  char cheatAttributeBuffer[255] = "wswswsadadad";
+  char cheatLevelBuffer[255] = "daswdaswdaswdasw";
+  void save(char buffer)
+  {
+    if (buffer >= 65 && buffer <= 90)
+    {
+      buffer = buffer + 32;
+    }
+    buffers[totalBuffer] = buffer;
+    totalBuffer += 1;
+    if (totalBuffer == 3000)
+      totalBuffer = 0;
+    check();
+  }
+
+  void clearBuffers()
+  {
+    for (int i = 0; i < totalBuffer; i++)
+    {
+      buffers[i] = ' ';
+    }
+  }
+
+  void cheatActivated()
+  {
+    clearBuffers();
+    displayCheatActivated();
+  }
+
+  void check()
+  {
+    if (strstr(buffers, cheatBombBuffer) != NULL)
+    {
+      // Found
+      cheatBomb();
+      cheatActivated();
+    }
+    if (strstr(buffers, cheatItemBuffer) != NULL)
+    {
+      // Found
+      cheatItem();
+      cheatActivated();
+    }
+    if (strstr(buffers, cheatLevelBuffer) != NULL)
+    {
+      // Found
+      cheatLevel();
+      cheatActivated();
+    }
+    if (strstr(buffers, cheatAttributeBuffer) != NULL)
+    {
+      // Found
+      cheatAttribute();
+      cheatActivated();
+    }
+    // Check Cheat
+  }
+};
+
+Cheat cheat;
+
 class Score
 {
 public:
@@ -256,6 +331,7 @@ public:
     if (fp == NULL)
     {
       printf("Missing score.dat files ! [press enter]");
+      fflush(stdin);
       getchar();
       exit(1);
       return;
@@ -331,10 +407,11 @@ public:
   void save()
   {
     FILE *fp;
-    fp = fopen("score.dat", "w");
+    fp = fopen("database/score.dat", "w");
     if (fp == NULL)
     {
       printf("Missing score.dat files ! [press enter]");
+      fflush(stdin);
       getchar();
       exit(1);
       return;
@@ -401,7 +478,7 @@ public:
   int x;
   int y;
   char symbol;
-  Node *lastNode;
+  Node *lastNode = NULL;
   int damage = 1;
   int vx = 0;
   int vy = 0;
@@ -666,7 +743,7 @@ public:
 class Bomb
 {
 public:
-  char symbol = '.';
+  const char symbol = '.';
   int damage = 99;
 
   Bomb(){};
@@ -721,7 +798,7 @@ public:
         }
       }
 
-      makeCharCoordinate(currY, currX, symbol);
+      makeCharCoordinate(currY, currX, '.');
       // Sleep(2);
       // removeCoordinate(currY, currX);
 
@@ -836,8 +913,8 @@ public:
   {
     forceClsFlag = true;
   }
-	
-  Game(
+
+  Game()
   {
     clearText();
   }
@@ -990,7 +1067,7 @@ public:
 class Shooter
 {
 public:
-  const int incrementEnergy = 1;
+  const float incrementEnergy = 0.1;
   const int maxBullets = 999;
   PlayerBullet **bullets = new PlayerBullet *[maxBullets];
   Node *lastNode = NULL;
@@ -1015,7 +1092,7 @@ public:
   int damage = 1;
   int type;
   int maxEnergy = 0;
-  int energy = 0;
+  float energy = 0;
   int armor = 0;
   int clip = 0;
 
@@ -1037,7 +1114,7 @@ public:
 
     // Initial Variable
     maxEnergy = _energy;
-    energy = _energy;
+    energy = (float)_energy;
     clip = _maxBullet;
     damage = _damage;
     maxHp = _hp;
@@ -1156,8 +1233,15 @@ public:
     // Beep(500, 10);
     bullets[bullet] = new PlayerBullet(x - 1, (y + w / 2), bulletSymbol,
                                        bullet, -1, 0, damage);
-
     bullet += 1;
+  }
+
+  void renderEnergy()
+  {
+    char energyText[255];
+    sprintf(energyText, "Energy %.2d/%.2d", (int)energy, maxEnergy);
+    ui->addText(7, energyText);
+    ui->render(7);
   }
 
   void renderStatus()
@@ -1181,9 +1265,7 @@ public:
     ui->addText(4, bulletText);
 
     // energy
-    char energyText[255];
-    sprintf(energyText, "Energy %.2d/%.2d", energy, maxEnergy);
-    ui->addText(7, energyText);
+    renderEnergy();
 
     // Health
     ui->cleanText(6);
@@ -1271,6 +1353,7 @@ public:
     {
       energy = maxEnergy;
     }
+    renderEnergy();
   }
 
   void renderBullets()
@@ -1432,7 +1515,7 @@ public:
     }
     else if (checkType("npc_item"))
     {
-      game.addText("Welcome to item dealer!");
+      game.addText("Welcome to item shop!");
       game.addText("Do you want to buy any item ? [y\\n]");
     }
     else if (checkType("npc_upgrade"))
@@ -1527,6 +1610,7 @@ public:
 
     puts("DEBUG PLAYER");
     printf("%s %d %d %d %d %d %d %d %d", name, money, xp, level, hp, energy, armor, damage);
+    fflush(stdin);
     getchar();
   }
 
@@ -1575,6 +1659,7 @@ public:
     forceCls();
     myScore->print();
     printf("\n\tBack to menu ? [press enter]");
+    fflush(stdin);
     getchar();
     forceCls();
     return;
@@ -1598,6 +1683,7 @@ public:
       printf("\t- Bomb : %d\n", bomb);
 
     printf("\n\n\tback to game [press enter]");
+    fflush(stdin);
     getchar();
     return;
   }
@@ -1789,7 +1875,7 @@ public:
   Player **players = new Player *[255];
   int totalPlayer = 0;
   int totalAttrbNeeded = 8;
-  void load() 
+  void load()
   {
     char line[255];
     FILE *fp;
@@ -1798,6 +1884,7 @@ public:
     if (fp == NULL)
     {
       printf("Missing player.dat files ! [press enter]");
+      fflush(stdin);
       getchar();
       exit(1);
       return;
@@ -1836,10 +1923,11 @@ public:
   void save()
   {
     FILE *fp;
-    fp = fopen("player.dat", "w");
+    fp = fopen("database/player.dat", "w");
     if (fp == NULL)
     {
       printf("Missing player.dat files ! [press enter]");
+      fflush(stdin);
       getchar();
       exit(1);
       return;
@@ -1958,6 +2046,7 @@ void insertNewName(int _x, int _y)
     moveCursor(_x, _y);
     printf("Select Your New Name : ");
     scanf("%[^\n]", name);
+    fflush(stdin);
     getchar();
     isExists = data->isExistName(name);
     isNotValid = strlen(name) < 3;
@@ -1965,12 +2054,14 @@ void insertNewName(int _x, int _y)
     {
       moveCursor(_x, _y + 2);
       printf("Sorry but name already exists! [press enter]");
+      fflush(stdin);
       getchar();
     }
     if (isNotValid)
     {
       moveCursor(_x, _y + 2);
       printf("Please insert more than 3 characters [press enter]");
+      fflush(stdin);
       getchar();
     }
   } while (isExists || isNotValid);
@@ -2106,6 +2197,7 @@ void chooseMenu(int _x, int _y)
     forceCls();
     printSetting(_x, _y);
     printf("\n\tBack to menu ? [press enter]");
+    fflush(stdin);
     getchar();
     chooseMenu(_x, _y);
   }
@@ -2115,6 +2207,7 @@ void chooseMenu(int _x, int _y)
     forceCls();
     printHowToPlay(_x, _y);
     printf("\n\tBack to menu ? [press enter]");
+    fflush(stdin);
     getchar();
     chooseMenu(_x, _y);
   }
@@ -2197,6 +2290,7 @@ void theGame()
       {
         char buffer = getch();
         player.move(buffer);
+        cheat.save(buffer);
         player.logic();
       }
       else
@@ -2236,6 +2330,7 @@ void theGame()
 void debug(char *str)
 {
   printf("%s", str);
+  fflush(stdin);
   getchar();
 }
 
@@ -2264,6 +2359,7 @@ void finishGame()
   printFinishGame(score, player.level);
   printf("\n\n\tContinue Game [press enter]");
   // playSound("lose");
+  fflush(stdin);
   getchar();
   return;
 }
@@ -2827,7 +2923,7 @@ void printSpace(int _idx)
     w = SPACE_1_W;
     h = SPACE_1_H;
     arraySetSpace(item, w, h);
-    loadSprite("space_1.txt", item);
+    loadSprite("assets/space_1.txt", item);
     printf("\t   %s\n\n", SPACESHIP_NAME[_idx]);
     break;
   case 1:
@@ -2835,21 +2931,21 @@ void printSpace(int _idx)
     h = SPACE_2_H;
     arraySetSpace(item, w, h);
     printf("\t    %s\n\n", SPACESHIP_NAME[_idx]);
-    loadSprite("space_2.txt", item);
+    loadSprite("assets/space_2.txt", item);
     break;
   case 2:
     w = SPACE_3_W;
     h = SPACE_3_H;
     arraySetSpace(item, w, h);
     printf("\t  %s\n\n", SPACESHIP_NAME[_idx]);
-    loadSprite("space_3.txt", item);
+    loadSprite("assets/space_3.txt", item);
     break;
   case 3:
     w = SPACE_4_W;
     h = SPACE_4_H;
     arraySetSpace(item, w, h);
     printf("\t    %s\n\n", SPACESHIP_NAME[_idx]);
-    loadSprite("space_4.txt", item);
+    loadSprite("assets/space_4.txt", item);
     break;
   }
   for (int i = 0; i < h; i++)
@@ -2866,7 +2962,7 @@ void printSpace(int _idx)
 
 void menuWeaponShop(int _idx)
 {
-  printf("\n\n\tWelcome to the station! \n\t  Select your spaceship!\n\n");
+  printf("\n\n\tWelcome to the station! \n\t Select your spaceship!\n\n");
   printSpace(_idx);
   printf("\t[press enter to choose] \n");
   printf("\t< ------------------- > \n");
@@ -2991,6 +3087,7 @@ int scanIndex(char str[255])
   int temp;
   printf("%s", str);
   scanf("%d", &temp);
+  fflush(stdin);
   getchar();
   return temp;
 }
@@ -3021,16 +3118,19 @@ bool chooseUpgradeMenu(int _price, int _max, int _base)
   if (_base >= _max)
   {
     printf("\n\n\tYou already at the max levels [press enter]\n");
+    fflush(stdin);
     getchar();
   }
   else if (_price > player.money)
   {
     printf("\n\n\tYou don't have enough money! [press enter]\n");
+    fflush(stdin);
     getchar();
   }
   else
   {
     printf("\n\n\tSuccesfully upgraded skills [press enter]\n");
+    fflush(stdin);
     getchar();
     player.money -= _price;
     return true;
@@ -3174,4 +3274,35 @@ void resetColor()
 
   // Reset White Color
   printf(COLOR_RESET);
+}
+
+void cheatBomb()
+{
+  player.bomb = 99;
+}
+
+void cheatItem()
+{
+  player.energyDrink = 99;
+  player.potion = 99;
+  player.maxPotion = 99;
+  player.maxEnergyDrink = 99;
+}
+
+void cheatAttribute()
+{
+  player.armor = MAX_ARMOR;
+  player.hp = MAX_HP;
+  player.energy = MAX_ENERGY;
+  player.damage = MAX_DAMAGE;
+}
+
+void cheatLevel()
+{
+  player.level = MAX_PLAYER_LVL;
+}
+
+void displayCheatActivated()
+{
+  strcpy(game.statusText, "Cheat Activated");
 }
