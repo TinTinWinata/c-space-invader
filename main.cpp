@@ -58,7 +58,7 @@ void playSound(char str[255]);
 void chooseMenu(int _x, int _y);
 void endScreen();
 void makeCharCoordinate(int _x, int _y, char _symbol);
-void printFinishGame(int _score, int _level);
+void printFinishGame(int _score, int _level, int _xp);
 void arraySetSpace(char _arr[255][255], int _w, int _h);
 void printSpace(int _idx);
 void loadSprite(char *_filename, char sprite[255][255]);
@@ -2337,9 +2337,8 @@ void debug(char *str)
 void finishGame()
 {
   GAME_IS_RUNNING = false;
-  game.changeState("lobby");
-  game.nextForceCLS();
-  game.skipBuffer();
+  // game.nextForceCLS();
+  // game.skipBuffer();
 
   // Delete all enemies
   // totalEnemy = 0;
@@ -2347,29 +2346,33 @@ void finishGame()
 
   // Calculate Level
   int score = myScore->score;
+  int gainedXp = score * 0.75;
 
   myScore->insert(score, player.name);
   myScore->save();
 
-  player.gainXp(score);
+  player.gainXp(gainedXp);
 
   // Insert Score
 
   forceCls();
-  printFinishGame(score, player.level);
+  printFinishGame(score, player.level, gainedXp);
   printf("\n\n\tContinue Game [press enter]");
+  game.changeState("lobby");
+  game.skipBuffer();
+  game.nextForceCLS();
   // playSound("lose");
   fflush(stdin);
   getchar();
   return;
 }
 
-void printFinishGame(int _score, int _level)
+void printFinishGame(int _score, int _level, int _xp)
 {
   printf("\n\tC Space Invader\n");
   printf("\t------------------\n");
   printf("\tYour score : %d\n", _score);
-  printf("\tYou gain %d exp\n", _score);
+  printf("\tYou gain %d exp\n", _xp);
   printf("\tYour current level is : %d", _level);
 }
 
