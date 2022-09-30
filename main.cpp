@@ -211,8 +211,9 @@ public:
       // First Always Get Colored Red
       if (i == 0)
       {
-        printf(COLOR_RESET);
-        printf("\u001b[41m");
+        // Background color Red
+        // printf(COLOR_RESET);
+        // printf("\u001b[41m");
       }
 
       for (int j = 0; j < totalColor; j++)
@@ -389,7 +390,8 @@ public:
   // Highscore Print
   void print()
   {
-    printf("\n\tC Space Invader Scoreboard\n\n");
+    printf("\n\tC Space Invader Scoreboard\n");
+    printf("\t==================================\n\n");
     if (allIdx == 0)
     {
       printf("\n\tThere's no other competitor!\n");
@@ -433,8 +435,6 @@ public:
     {
       if (strcmp(allName[i], _name) == 0)
       {
-        // printf("Found! %s changing to %d", name, _score);
-        // getchar();
         // Is found just update the score
         if (allScore[i] < _score)
         {
@@ -3091,7 +3091,7 @@ int scanIndex(char str[255])
   printf("%s", str);
   scanf("%d", &temp);
   fflush(stdin);
-  getchar();
+  // getchar();
   return temp;
 }
 
@@ -3307,5 +3307,6 @@ void cheatLevel()
 
 void displayCheatActivated()
 {
-  strcpy(game.statusText, "Cheat Activated");
+  // add space at the code below for fixing bug
+  strcpy(game.statusText, "Cheat Activated                             ");
 }
